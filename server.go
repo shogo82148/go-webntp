@@ -12,10 +12,10 @@ type Server struct {
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	res := &Response{
 		ID:           req.Host,
-		InitiateTime: 0,
-		SendTime:     timeToTimestamp(time.Now()),
+		InitiateTime: zeroEpochTime,
+		SendTime:     Timestamp(time.Now()),
 		Leap:         0,
-		Next:         0,
+		Next:         zeroEpochTime,
 		Step:         0,
 	}
 

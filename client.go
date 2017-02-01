@@ -48,7 +48,7 @@ func (c *Client) Get(url string) (Result, error) {
 	if err = dec.Decode(&result); err != nil {
 		return Result{}, err
 	}
-	ntpTime := timestampToTime(result.SendTime)
+	ntpTime := time.Time(result.SendTime)
 	delay := end.Sub(start)
 	offset := start.Sub(ntpTime) + delay/2
 
