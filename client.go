@@ -80,7 +80,8 @@ func (c *Client) getWebsocket(uri string) (Result, error) {
 	}
 
 	// Send the request
-	err = conn.WriteJSON(Timestamp(time.Now()))
+	start := time.Now()
+	err = conn.WriteJSON(Timestamp(start))
 	if err != nil {
 		return Result{}, nil
 	}
@@ -91,7 +92,6 @@ func (c *Client) getWebsocket(uri string) (Result, error) {
 	if err != nil {
 		return Result{}, nil
 	}
-	start := time.Time(response.InitiateTime)
 	end := time.Now()
 	delay := end.Sub(start)
 	offset := start.Sub(time.Time(response.SendTime)) + delay/2
