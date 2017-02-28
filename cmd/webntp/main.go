@@ -45,7 +45,7 @@ func client(hosts []string) error {
 			fmt.Printf("%s: Error %v\n", arg, err)
 		} else {
 			fmt.Printf(
-				"uri %s, offset %.6f s, delay %.6f s\n",
+				"uri %s, offset %.6f, delay %.6f\n",
 				arg,
 				result.Offset.Seconds(),
 				result.Delay.Seconds(),
