@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -13,12 +14,20 @@ import (
 // Client is a webntp client.
 type Client struct {
 	HTTPClient *http.Client
+
+	mu   sync.Mutex
+	pool map[string]*wsConn
 }
 
 // Result is the result of synchronization.
 type Result struct {
 	Offset time.Duration
 	Delay  time.Duration
+}
+
+type wsConn struct {
+	mu   sync.Mutex
+	conn *websocket.Conn
 }
 
 // Get gets synchronization information.
@@ -77,10 +86,13 @@ func (c *Client) getHTTP(uri string) (Result, error) {
 }
 
 func (c *Client) getWebsocket(uri string) (Result, error) {
-	conn, _, err := websocket.DefaultDialer.Dial(uri, nil)
+	wsConn, err := c.getConn(uri)
 	if err != nil {
-		return Result{}, nil
+		return Result{}, err
 	}
+	wsConn.mu.Lock()
+	defer wsConn.mu.Unlock()
+	conn := wsConn.conn
 
 	// Send the request
 	start := time.Now()
@@ -103,4 +115,28 @@ func (c *Client) getWebsocket(uri string) (Result, error) {
 		Delay:  delay,
 		Offset: offset,
 	}, nil
+}
+
+func (c *Client) getConn(uri string) (*wsConn, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	conn, ok := c.pool[uri]
+	if !ok || conn == nil {
+		if c.pool == nil {
+			c.pool = make(map[string]*wsConn, 1)
+		}
+		conn = &wsConn{}
+		c.pool[uri] = conn
+	}
+
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
+	if conn.conn == nil {
+		conn2, _, err := websocket.DefaultDialer.Dial(uri, nil)
+		if err != nil {
+			return nil, err
+		}
+		conn.conn = conn2
+	}
+	return conn, nil
 }
