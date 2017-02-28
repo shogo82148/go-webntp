@@ -3,17 +3,14 @@ package webntp
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
 	"time"
-
-	"os"
-
-	"io"
-
-	"fmt"
 
 	"github.com/gorilla/websocket"
 )
