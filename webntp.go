@@ -32,15 +32,21 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 	b = strconv.AppendInt(b, tt.Unix(), 10)
 	b = append(b, '.')
 
-	// write milliseconds
-	milli := (time.Duration(tt.Nanosecond()) + 500*time.Microsecond) / time.Millisecond
+	// write microsecond
+	m := (time.Duration(tt.Nanosecond()) + 500*time.Nanosecond) / time.Microsecond
 	switch {
-	case milli < 10:
+	case m < 10:
+		b = append(b, '0', '0', '0', '0', '0')
+	case m < 100:
+		b = append(b, '0', '0', '0', '0')
+	case m < 1000:
+		b = append(b, '0', '0', '0')
+	case m < 10000:
 		b = append(b, '0', '0')
-	case milli < 100:
+	case m < 100000:
 		b = append(b, '0')
 	}
-	b = strconv.AppendInt(b, int64(milli), 10)
+	b = strconv.AppendInt(b, int64(m), 10)
 	return b, nil
 }
 
