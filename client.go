@@ -10,15 +10,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Client is a webntp client.
 type Client struct {
 	HTTPClient *http.Client
 }
 
+// Result is the result of synchronization.
 type Result struct {
 	Offset time.Duration
 	Delay  time.Duration
 }
 
+// Get gets synchronization information.
 func (c *Client) Get(uri string) (Result, error) {
 	u, err := url.Parse(uri)
 	if err != nil {

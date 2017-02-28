@@ -10,6 +10,7 @@ import (
 	"unicode"
 )
 
+// Timestamp is posix unix timestamp.
 type Timestamp time.Time
 
 var zeroEpochTime Timestamp
@@ -22,6 +23,8 @@ func init() {
 	zeroEpochTime = Timestamp(t)
 }
 
+// MarshalJSON converts the timestamp to JSON number.
+// The number is unix timestamp.
 func (t Timestamp) MarshalJSON() ([]byte, error) {
 	// write seconds.
 	tt := time.Time(t)
@@ -41,6 +44,8 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 	return b, nil
 }
 
+// UnmarshalJSON converts JSON number to a timestamp.
+// The number is unix timestamp.
 func (t *Timestamp) UnmarshalJSON(b []byte) error {
 	intSec, nanoSec := int64(0), int64(0)
 	nanoSecPos := int64(1e9)
@@ -88,6 +93,7 @@ FALLBACK:
 	return nil
 }
 
+// Response is a response from webntp server.
 type Response struct {
 	ID           string    `json:"id"`
 	InitiateTime Timestamp `json:"it"`
