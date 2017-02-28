@@ -187,6 +187,8 @@ func (p *leapSecondsParser) parseComment() {
 		return
 	}
 	switch r {
+	case '\n':
+		return
 	case ' ':
 		// normal comment line
 	case '$':

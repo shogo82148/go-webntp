@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -25,6 +26,8 @@ type Server struct {
 
 	// url for leap-seconds.list
 	LeapSecondsURL string
+
+	leapSecondsList atomic.Value
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -33,13 +36,15 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	now := time.Now()
+	leap := s.getLeapSecond(now)
 	res := &Response{
 		ID:           req.Host,
 		InitiateTime: zeroEpochTime,
-		SendTime:     Timestamp(time.Now()),
-		Leap:         0,
-		Next:         zeroEpochTime,
-		Step:         0,
+		SendTime:     Timestamp(now),
+		Leap:         leap.Leap,
+		Next:         Timestamp(leap.At),
+		Step:         leap.Step,
 	}
 
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -88,13 +93,15 @@ func (s *Server) handleWebsocketConn(conn *websocket.Conn, host string) error {
 	}
 
 	// send the response
+	now := time.Now()
+	leap := s.getLeapSecond(now)
 	res := &Response{
 		ID:           host,
 		InitiateTime: start,
-		SendTime:     Timestamp(time.Now()),
-		Leap:         0,
-		Next:         zeroEpochTime,
-		Step:         0,
+		SendTime:     Timestamp(now),
+		Leap:         leap.Leap,
+		Next:         Timestamp(leap.At),
+		Step:         leap.Step,
 	}
 	return conn.WriteJSON(res)
 }
@@ -108,6 +115,35 @@ func (s *Server) Start() error {
 	return nil
 }
 
-func (s *Server) fetchLeapSeconds() {
+func (s *Server) getLeapSecond(now time.Time) LeapSecond {
+	list, ok := s.leapSecondsList.Load().(*LeapSecondsList)
+	if !ok {
+		return LeapSecond{
+			At: time.Time(zeroEpochTime),
+		}
+	}
+	var i int
+	for i = len(list.LeapSeconds); i > 0; i-- {
+		if list.LeapSeconds[i-1].At.Before(now) {
+			break
+		}
+	}
+	if i == len(list.LeapSeconds) {
+		return list.LeapSeconds[i-1]
+	}
+	return list.LeapSeconds[i]
+}
 
+func (s *Server) fetchLeapSeconds() {
+	resp, err := http.Get(s.LeapSecondsURL)
+	if err != nil {
+		log.Printf("error while getting from %s: %v", s.LeapSecondsURL, err)
+		return
+	}
+	defer resp.Body.Close()
+	list, err := ParseLeapSecondsList(resp.Body)
+	if err != nil {
+		log.Printf("parse leap-sencond.list error: %v", err)
+	}
+	s.leapSecondsList.Store(list)
 }
