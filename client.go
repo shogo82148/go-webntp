@@ -2,6 +2,7 @@ package webntp
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -33,8 +34,10 @@ type Result struct {
 }
 
 type wsConn struct {
-	mu   sync.Mutex
-	conn *websocket.Conn
+	mu     sync.Mutex
+	conn   *websocket.Conn
+	pong   chan struct{}
+	result chan Result
 }
 
 // Get gets synchronization information.
@@ -105,23 +108,18 @@ func (c *Client) getWebsocket(uri string) (Result, error) {
 	start := time.Now()
 	err = conn.WriteJSON(Timestamp(start))
 	if err != nil {
-		return Result{}, nil
+		return Result{}, err
 	}
 
-	// Parse the response
-	var response Response
-	err = conn.ReadJSON(&response)
-	if err != nil {
-		return Result{}, nil
+	select {
+	case result, ok := <-wsConn.result:
+		if ok {
+			return result, nil
+		}
+		return Result{}, errors.New("webntp: connection is closed")
+	case <-time.After(10 * time.Second):
+		return Result{}, errors.New("webntp: timeout")
 	}
-	end := time.Now()
-	delay := end.Sub(start)
-	offset := start.Sub(time.Time(response.SendTime)) + delay/2
-
-	return Result{
-		Delay:  delay,
-		Offset: offset,
-	}, nil
 }
 
 func (c *Client) getConn(uri string) (*wsConn, error) {
@@ -138,16 +136,84 @@ func (c *Client) getConn(uri string) (*wsConn, error) {
 
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
-	if conn.conn == nil {
-		dialer := c.Dialer
-		if dialer == nil {
-			dialer = DefaultDialer
+
+	dialer := c.Dialer
+	if dialer == nil {
+		dialer = DefaultDialer
+	}
+
+	var err error
+	for i := 0; i < 3; i++ {
+		err = conn.dial(dialer, uri)
+		if err != nil {
+			// retry
+			conn.conn.Close()
+			conn.conn = nil
+			continue
 		}
+
+		// success
+		return conn, nil
+	}
+
+	// give up :(
+	return nil, err
+}
+
+func (conn *wsConn) dial(dialer *websocket.Dialer, uri string) error {
+	if conn.conn == nil {
 		conn2, _, err := dialer.Dial(uri, nil)
 		if err != nil {
-			return nil, err
+			return err
 		}
+		conn.pong = make(chan struct{}, 1)
+		conn.result = make(chan Result, 1)
 		conn.conn = conn2
+		go conn.readLoop()
 	}
-	return conn, nil
+
+	// check the connection is now available.
+	err := conn.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second))
+	if err != nil {
+		return err
+	}
+	select {
+	case _, ok := <-conn.pong:
+		if !ok {
+			return errors.New("webntp: connection is closed")
+		}
+	case <-time.After(10 * time.Second):
+		return errors.New("webntp: pong timeout")
+	}
+	return nil
+}
+
+func (conn *wsConn) readLoop() {
+	conn.conn.SetPongHandler(func(string) error {
+		select {
+		case conn.pong <- struct{}{}:
+		default:
+		}
+		return nil
+	})
+	defer close(conn.pong)
+	defer close(conn.result)
+
+	for {
+		// Parse the response
+		var response Response
+		err := conn.conn.ReadJSON(&response)
+		if err != nil {
+			return
+		}
+		end := time.Now()
+		start := time.Time(response.InitiateTime)
+		delay := end.Sub(start)
+		offset := start.Sub(time.Time(response.SendTime)) + delay/2
+
+		conn.result <- Result{
+			Delay:  delay,
+			Offset: offset,
+		}
+	}
 }

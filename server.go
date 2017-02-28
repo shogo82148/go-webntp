@@ -66,6 +66,7 @@ func (s *Server) handleWebsocket(rw http.ResponseWriter, req *http.Request) {
 		log.Println("upgrade error: ", err)
 		return
 	}
+	defer conn.Close()
 
 	for {
 		err := s.handleWebsocketConn(conn, req.Host)
