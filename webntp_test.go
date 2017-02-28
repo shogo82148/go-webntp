@@ -139,6 +139,7 @@ func BenchmarkGet(b *testing.B) {
 		LeapSecondsPath: "leap-seconds.list",
 		LeapSecondsURL:  "https://www.ietf.org/timezones/data/leap-seconds.list",
 	}
+	s.Start()
 	ts := httptest.NewServer(s)
 	defer ts.Close()
 
@@ -154,6 +155,7 @@ func BenchmarkGetWS(b *testing.B) {
 		LeapSecondsPath: "leap-seconds.list",
 		LeapSecondsURL:  "https://www.ietf.org/timezones/data/leap-seconds.list",
 	}
+	s.Start()
 	ts := httptest.NewServer(s)
 	defer ts.Close()
 	u, _ := url.Parse(ts.URL)
@@ -164,6 +166,20 @@ func BenchmarkGetWS(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		c.Get(wsURL)
+	}
+}
+
+func BenchmarkServeHTTP(b *testing.B) {
+	s := &Server{
+		LeapSecondsPath: "leap-seconds.list",
+		LeapSecondsURL:  "https://www.ietf.org/timezones/data/leap-seconds.list",
+	}
+	s.Start()
+	req := httptest.NewRequest("GET", "http://example.com/foo", nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		s.ServeHTTP(w, req)
 	}
 }
 
