@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -42,9 +43,16 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	now := time.Now()
 	leap := s.getLeapSecond(now)
+	start := zeroEpochTime
+	if q := req.URL.RawQuery; q != "" {
+		err := start.UnmarshalJSON([]byte(strings.TrimSpace(q)))
+		if err != nil {
+			return
+		}
+	}
 	res := &Response{
 		ID:           req.Host,
-		InitiateTime: zeroEpochTime,
+		InitiateTime: start,
 		SendTime:     Timestamp(now),
 		Leap:         leap.Leap,
 		Next:         Timestamp(leap.At),
