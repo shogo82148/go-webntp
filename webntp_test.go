@@ -1,6 +1,7 @@
 package webntp
 
 import (
+	"bytes"
 	"testing"
 	"time"
 )
@@ -69,6 +70,52 @@ func TestTimestamp_UnmarshalJSON(t *testing.T) {
 		if !tt.UTC().Equal(time.Time(timestamp).UTC()) {
 			t.Errorf("want %s, got %s (%s)", tt, time.Time(timestamp), tc.str)
 		}
+	}
+}
+
+func TestParseLeapSecondsList(t *testing.T) {
+	r := bytes.NewBuffer([]byte(`
+# leap-seconds.list for test
+
+# This line is not a leap second.
+# It is the definition of the relationship between UTC and TAI.
+2272060800	10	# 1 Jan 1972
+
+# A leap second.
+2287785600	11	# 1 Jul 1972
+
+# It's test for negative leap second.
+# In fact, the leap second on 1 Jan 1973 is positive
+2303683200	10	# 1 Jan 1973
+`))
+	l, err := ParseLeapSecondsList(r)
+
+	if len(l.LeapSeconds) != 2 {
+		t.Errorf("want the length of leap second list is 2, got %d", len(l.LeapSeconds))
+	}
+
+	if expected, _ := time.Parse(time.RFC3339, "1972-07-01T00:00:00Z"); !l.LeapSeconds[0].At.Equal(expected) {
+		t.Errorf("want list[0].At is %s, got %s", expected, l.LeapSeconds[0].At)
+	}
+	if l.LeapSeconds[0].Leap != 10 {
+		t.Errorf("want list[0].Leap is 10, got %d", l.LeapSeconds[0].Leap)
+	}
+	if l.LeapSeconds[0].Step != 1 {
+		t.Errorf("want list[0].Step is 1, got %d", l.LeapSeconds[0].Step)
+	}
+
+	if expected, _ := time.Parse(time.RFC3339, "1973-01-01T00:00:00Z"); !l.LeapSeconds[1].At.Equal(expected) {
+		t.Errorf("want list[1].At is %s, got %s", expected, l.LeapSeconds[1].At)
+	}
+	if l.LeapSeconds[1].Leap != 11 {
+		t.Errorf("want list[1].Leap is 11, got %d", l.LeapSeconds[1].Leap)
+	}
+	if l.LeapSeconds[1].Step != -1 {
+		t.Errorf("want list[1].Step is -1, got %d", l.LeapSeconds[1].Step)
+	}
+
+	if err != nil {
+		t.Error(err)
 	}
 }
 

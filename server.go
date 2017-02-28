@@ -16,8 +16,15 @@ var defaultUpgrader = &websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+// Server is a webntp server.
 type Server struct {
 	Upgrader *websocket.Upgrader
+
+	// path for leap-seconds.list cache
+	LeapSecondsPath string
+
+	// url for leap-seconds.list
+	LeapSecondsURL string
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -90,4 +97,17 @@ func (s *Server) handleWebsocketConn(conn *websocket.Conn, host string) error {
 		Step:         0,
 	}
 	return conn.WriteJSON(res)
+}
+
+// Start starts fetching leap-seconds.list
+func (s *Server) Start() error {
+	if s.LeapSecondsURL == "" {
+		return nil
+	}
+	go s.fetchLeapSeconds()
+	return nil
+}
+
+func (s *Server) fetchLeapSeconds() {
+
 }

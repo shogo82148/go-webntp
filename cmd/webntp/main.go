@@ -11,11 +11,14 @@ import (
 
 func main() {
 	var serveHost string
+	var leapSecondsPath, leapSecondsURL string
 	flag.StringVar(&serveHost, "serve", "", "server host name")
+	flag.StringVar(&leapSecondsPath, "leap-second-path", "leap-seconds.list", "path for leap-seconds.list cache")
+	flag.StringVar(&leapSecondsURL, "leap-second-url", "https://www.ietf.org/timezones/data/leap-seconds.list", "url for leap-seconds.list")
 	flag.Parse()
 
 	if serveHost != "" {
-		if err := serve(serveHost); err != nil {
+		if err := serve(serveHost, leapSecondsPath, leapSecondsURL); err != nil {
 			log.Fatal(err)
 		}
 	} else {
@@ -25,8 +28,12 @@ func main() {
 	}
 }
 
-func serve(host string) error {
-	s := &webntp.Server{}
+func serve(host, leapSecondsPath, leapSecondsURL string) error {
+	s := &webntp.Server{
+		LeapSecondsPath: leapSecondsPath,
+		LeapSecondsURL:  leapSecondsURL,
+	}
+	s.Start()
 	return http.ListenAndServe(host, s)
 }
 
