@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"io"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -105,8 +107,11 @@ func (c *Client) getWebsocket(uri string) (Result, error) {
 	conn := wsConn.conn
 
 	// Send the request
-	start := time.Now()
-	err = conn.WriteJSON(Timestamp(start))
+	b, err := Timestamp(time.Now()).MarshalJSON()
+	if err != nil {
+		return Result{}, err
+	}
+	err = conn.WriteMessage(websocket.TextMessage, b)
 	if err != nil {
 		return Result{}, err
 	}
@@ -199,14 +204,31 @@ func (conn *wsConn) readLoop() {
 	defer close(conn.pong)
 	defer close(conn.result)
 
+	var buf [1024]byte
+	conn.conn.SetReadLimit(int64(len(buf)))
 	for {
-		// Parse the response
-		var response Response
-		err := conn.conn.ReadJSON(&response)
+		// read the response.
+		_, r, err := conn.conn.NextReader()
 		if err != nil {
 			return
 		}
+
 		end := time.Now()
+		var n int
+		for n < len(buf) && err == nil {
+			var nn int
+			nn, err = r.Read(buf[n:])
+			n += nn
+		}
+		if err != io.EOF {
+			return
+		}
+
+		// parse the response.
+		var response Response
+		if err := json.Unmarshal(buf[:n], &response); err != nil {
+			return
+		}
 		start := time.Time(response.InitiateTime)
 		delay := end.Sub(start)
 		offset := start.Sub(time.Time(response.SendTime)) + delay/2
