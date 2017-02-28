@@ -99,6 +99,9 @@ FALLBACK:
 	return nil
 }
 
+// Subprotocol is a subprotocol name for websocket.
+const Subprotocol = "webntp.shogo82148.com"
+
 // Response is a response from webntp server.
 type Response struct {
 	ID           string    `json:"id"`

@@ -18,6 +18,7 @@ import (
 var defaultUpgrader = &websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	Subprotocols:    []string{Subprotocol},
 }
 
 // Server is a webntp server.

@@ -14,9 +14,16 @@ import (
 // Client is a webntp client.
 type Client struct {
 	HTTPClient *http.Client
+	Dialer     *websocket.Dialer
 
 	mu   sync.Mutex
 	pool map[string]*wsConn
+}
+
+// DefaultDialer is a dialer for webntp.
+var DefaultDialer = &websocket.Dialer{
+	Proxy:        http.ProxyFromEnvironment,
+	Subprotocols: []string{Subprotocol},
 }
 
 // Result is the result of synchronization.
@@ -132,7 +139,11 @@ func (c *Client) getConn(uri string) (*wsConn, error) {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
 	if conn.conn == nil {
-		conn2, _, err := websocket.DefaultDialer.Dial(uri, nil)
+		dialer := c.Dialer
+		if dialer == nil {
+			dialer = DefaultDialer
+		}
+		conn2, _, err := dialer.Dial(uri, nil)
 		if err != nil {
 			return nil, err
 		}
