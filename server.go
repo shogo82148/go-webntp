@@ -9,6 +9,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"os"
+
+	"io"
+
+	"fmt"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -108,10 +114,13 @@ func (s *Server) handleWebsocketConn(conn *websocket.Conn, host string) error {
 
 // Start starts fetching leap-seconds.list
 func (s *Server) Start() error {
+	if err := s.readLeapSecondsCache(); err != nil {
+		log.Println(err)
+	}
 	if s.LeapSecondsURL == "" {
 		return nil
 	}
-	go s.fetchLeapSeconds()
+	go s.loopLeapSeconds()
 	return nil
 }
 
@@ -134,16 +143,90 @@ func (s *Server) getLeapSecond(now time.Time) LeapSecond {
 	return list.LeapSeconds[i]
 }
 
-func (s *Server) fetchLeapSeconds() {
-	resp, err := http.Get(s.LeapSecondsURL)
-	if err != nil {
-		log.Printf("error while getting from %s: %v", s.LeapSecondsURL, err)
-		return
+func (s *Server) readLeapSecondsCache() error {
+	if s.LeapSecondsPath == "" {
+		return nil
 	}
-	defer resp.Body.Close()
-	list, err := ParseLeapSecondsList(resp.Body)
+
+	f, err := os.Open(s.LeapSecondsPath)
 	if err != nil {
-		log.Printf("parse leap-sencond.list error: %v", err)
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer f.Close()
+	list, err := ParseLeapSecondsList(f)
+	if err != nil {
+		return err
 	}
 	s.leapSecondsList.Store(list)
+	return nil
+}
+
+func (s *Server) loopLeapSeconds() {
+	err := s.checkAndFetch(time.Now())
+	if err != nil {
+		log.Println(err)
+	}
+	timer := time.NewTimer(24 * time.Hour)
+	defer timer.Stop()
+	for {
+		select {
+		case now := <-timer.C:
+			err := s.checkAndFetch(now)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
+}
+
+func (s *Server) checkAndFetch(now time.Time) error {
+	list, ok := s.leapSecondsList.Load().(*LeapSecondsList)
+	if !ok || now.After(list.ExpireAt) {
+		log.Printf("fetch %s", s.LeapSecondsURL)
+		err := s.fetchLeapSeconds()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) fetchLeapSeconds() error {
+	// open cache file
+	name := fmt.Sprintf("%s.%d", s.LeapSecondsPath, time.Now().Unix())
+	f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		f.Close()
+		os.Remove(name)
+	}()
+
+	// get
+	resp, err := http.Get(s.LeapSecondsURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// write to cache, and parse it.
+	r := io.TeeReader(resp.Body, f)
+	list, err := ParseLeapSecondsList(r)
+	if err != nil {
+		return err
+	}
+	s.leapSecondsList.Store(list)
+
+	// update cache file
+	f.Close()
+	err = os.Rename(name, s.LeapSecondsPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
