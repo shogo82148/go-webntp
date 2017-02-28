@@ -175,11 +175,33 @@ LOOP:
 
 	return &LeapSecondsList{
 		LeapSeconds: p.list[1:],
+		UpdateAt:    p.updateAt,
+		ExpireAt:    p.expireAt,
 	}, nil
 }
 
 func (p *leapSecondsParser) parseComment() {
-	// TODO: parse special comment
+	var r rune
+	r, _, p.err = p.r.ReadRune()
+	if p.err != nil {
+		return
+	}
+	switch r {
+	case ' ':
+		// normal comment line
+	case '$':
+		// last update date
+		i := p.getInt(64)
+		p.updateAt = time.Unix(i-ntpEpochOffset, 0)
+	case '@':
+		// the expiration date
+		i := p.getInt(64)
+		p.expireAt = time.Unix(i-ntpEpochOffset, 0)
+	case 'h':
+		// hash value of the data
+	default:
+		// unknown comment line. ignore it.
+	}
 	p.skipLine()
 }
 
@@ -233,6 +255,7 @@ func (p *leapSecondsParser) skipLine() {
 }
 
 func (p *leapSecondsParser) getInt(size int) int64 {
+	p.skipSpace()
 	if p.err != nil {
 		return 0
 	}

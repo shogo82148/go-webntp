@@ -77,6 +77,12 @@ func TestParseLeapSecondsList(t *testing.T) {
 	r := bytes.NewBuffer([]byte(`
 # leap-seconds.list for test
 
+# Last Update of leap second values:   8 July 2016
+#$	 3676924800
+
+# File expires on:  28 June 2017
+#@	3707596800
+
 # This line is not a leap second.
 # It is the definition of the relationship between UTC and TAI.
 2272060800	10	# 1 Jan 1972
@@ -89,6 +95,13 @@ func TestParseLeapSecondsList(t *testing.T) {
 2303683200	10	# 1 Jan 1973
 `))
 	l, err := ParseLeapSecondsList(r)
+
+	if expected, _ := time.Parse(time.RFC3339, "2016-07-08T00:00:00Z"); !l.UpdateAt.Equal(expected) {
+		t.Errorf("want update_at is %s, got %s", expected, l.UpdateAt)
+	}
+	if expected, _ := time.Parse(time.RFC3339, "2017-06-28T00:00:00Z"); !l.ExpireAt.Equal(expected) {
+		t.Errorf("want expire_at is %s, got %s", expected, l.ExpireAt)
+	}
 
 	if len(l.LeapSeconds) != 2 {
 		t.Errorf("want the length of leap second list is 2, got %d", len(l.LeapSeconds))
