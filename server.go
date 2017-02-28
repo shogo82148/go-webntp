@@ -113,6 +113,9 @@ func (s *Server) handleWebsocketConn(conn *websocket.Conn, host string) error {
 
 // Start starts fetching leap-seconds.list
 func (s *Server) Start() error {
+	// warm up json encoder.
+	json.Marshal(&Response{})
+
 	if err := s.readLeapSecondsCache(); err != nil {
 		log.Println(err)
 	}
