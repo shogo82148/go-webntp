@@ -60,6 +60,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+	rw.Header().Set("Cache-Control", "no-cache, no-store")
 	enc := json.NewEncoder(rw)
 	enc.Encode(res)
 }
