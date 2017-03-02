@@ -55,6 +55,39 @@ func (c *Client) Get(uri string) (Result, error) {
 	return c.getHTTP(uri)
 }
 
+// GetMulti gets synchronization information.
+// It improve accuracy by calling the Get method many times.
+func (c *Client) GetMulti(uri string, samples int) (Result, error) {
+	results := make([]Result, samples)
+	minDelay := time.Duration(1<<63 - 1) // the maximum number of time.Duration
+	for i := range results {
+		var err error
+		results[i], err = c.Get(uri)
+		if err != nil {
+			return Result{}, err
+		}
+		if results[i].Delay < minDelay {
+			minDelay = results[i].Delay
+		}
+		time.Sleep(time.Second)
+	}
+
+	var result Result
+	var num int
+	for _, r := range results {
+		if r.Delay >= minDelay*2 {
+			// this sample may be re-sent. ignore it.
+			continue
+		}
+		result.Delay += r.Delay
+		result.Offset += r.Offset
+		num++
+	}
+	result.Delay /= time.Duration(num)
+	result.Offset /= time.Duration(num)
+	return result, nil
+}
+
 func (c *Client) getHTTP(uri string) (Result, error) {
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
