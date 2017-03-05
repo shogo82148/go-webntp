@@ -10,12 +10,15 @@ import (
 	"github.com/shogo82148/go-webntp"
 )
 
+var help bool
 var serveHost string
 var allowCrossOrigin bool
 var leapSecondsPath, leapSecondsURL string
 var samples int
 
 func init() {
+	flag.BoolVar(&help, "help", false, "show help")
+
 	// Server options
 	flag.StringVar(&serveHost, "serve", "", "server host name")
 	flag.BoolVar(&allowCrossOrigin, "allow-cross-origin", false, "allow cross origin request")
@@ -28,6 +31,14 @@ func init() {
 
 func main() {
 	flag.Parse()
+
+	if serveHost == "" && flag.NArg() == 0 {
+		help = true
+	}
+	if help {
+		flag.PrintDefaults()
+		return
+	}
 
 	if serveHost != "" {
 		if err := serve(); err != nil {
