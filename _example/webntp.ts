@@ -76,7 +76,7 @@ module WebNTP {
             const now = Date.now()/1000;
             const res: Response = JSON.parse(ev.data);
             const delay = now - res.it;
-            const offset =  res.it - res.st + delay/2;
+            const offset = res.st - res.it - delay/2;
             const result: Result = {
                 delay: delay,
                 offset: offset

@@ -264,7 +264,7 @@ func (conn *wsConn) readLoop() {
 		}
 		start := time.Time(response.InitiateTime)
 		delay := end.Sub(start)
-		offset := start.Sub(time.Time(response.SendTime)) + delay/2
+		offset := time.Time(response.SendTime).Sub(start) - delay/2
 
 		conn.result <- Result{
 			Delay:  delay,

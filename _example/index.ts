@@ -17,7 +17,7 @@ namespace WebNTPTest {
             return;
         }
         const now = Date.now();
-        const remote = now - result.offset;
+        const remote = now + result.offset;
         clock.innerText = new Date(remote).toString();
         requestAnimationFrame(show);
     }
