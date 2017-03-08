@@ -107,6 +107,7 @@ type Response struct {
 	ID           string    `json:"id"`
 	InitiateTime Timestamp `json:"it"`
 	SendTime     Timestamp `json:"st"`
+	Time         Timestamp `json:"time"` // htptime compatibility
 	Leap         int       `json:"leap"`
 	Next         Timestamp `json:"next"`
 	Step         int       `json:"step"`

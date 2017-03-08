@@ -136,12 +136,18 @@ func (c *Client) getHTTP(uri string) (Result, error) {
 		return Result{}, err
 	}
 	ntpTime := time.Time(result.SendTime)
+	if ntpTime.IsZero() {
+		ntpTime = time.Time(result.Time) // fallback htptime
+	}
 	delay := end.Sub(start)
 	offset := start.Sub(ntpTime) + delay/2
 
 	return Result{
-		Delay:  delay,
-		Offset: offset,
+		Delay:     delay,
+		Offset:    offset,
+		NextLeap:  time.Time(result.Next),
+		TAIOffset: time.Duration(result.Leap) * time.Second,
+		Step:      result.Step,
 	}, nil
 }
 
