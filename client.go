@@ -107,6 +107,7 @@ func (c *Client) getHTTP(uri string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	req.Header.Set("User-Agent", "webntp.shogo82148.com")
 
 	// Install ClientTrace
 	var start, end time.Time
