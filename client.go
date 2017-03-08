@@ -33,8 +33,11 @@ var DefaultDialer = &websocket.Dialer{
 
 // Result is the result of synchronization.
 type Result struct {
-	Offset time.Duration
-	Delay  time.Duration
+	Offset    time.Duration
+	Delay     time.Duration
+	NextLeap  time.Time
+	TAIOffset time.Duration
+	Step      int
 }
 
 type wsConn struct {
@@ -83,7 +86,7 @@ func (c *Client) GetMulti(uri string, samples int) (Result, error) {
 		}
 	}
 
-	var result Result
+	result := results[len(results)-1]
 	var num int
 	for _, r := range results {
 		if r.Delay >= minDelay*2 {
@@ -278,8 +281,11 @@ func (conn *wsConn) readLoop() {
 		offset := time.Time(response.SendTime).Sub(start) - delay/2
 
 		conn.result <- Result{
-			Delay:  delay,
-			Offset: offset,
+			Delay:     delay,
+			Offset:    offset,
+			NextLeap:  time.Time(response.Next),
+			TAIOffset: time.Duration(response.Leap) * time.Second,
+			Step:      response.Step,
 		}
 	}
 }

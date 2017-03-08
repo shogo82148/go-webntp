@@ -162,5 +162,23 @@ func setClock(result webntp.Result) error {
 	shm.SetReceiveTimeStamp(local)
 	shm.SetPrecision(precision)
 
+	// set leap second indicator
+	leap := result.NextLeap.Sub(remote)
+	if leap <= 0 {
+		shm.SetLeap(ntpdshm.LeapNoWarning)
+		return nil
+	}
+	if leap > 24*time.Hour {
+		shm.SetLeap(ntpdshm.LeapNoWarning)
+		return nil
+	}
+	if result.Step > 0 {
+		shm.SetLeap(ntpdshm.LeapAddSecond)
+	} else if result.Step < 0 {
+		shm.SetLeap(ntpdshm.LeapDelSecond)
+	} else {
+		shm.SetLeap(ntpdshm.LeapNotInSync)
+	}
+
 	return nil
 }
