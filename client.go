@@ -1,15 +1,17 @@
 package webntp
 
 import (
+	crand "crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"io"
+	"math/rand"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
 	"sync"
 	"time"
-
-	"io"
 
 	"github.com/gorilla/websocket"
 )
@@ -58,6 +60,12 @@ func (c *Client) Get(uri string) (Result, error) {
 // GetMulti gets synchronization information.
 // It improve accuracy by calling the Get method many times.
 func (c *Client) GetMulti(uri string, samples int) (Result, error) {
+	var s int64
+	if err := binary.Read(crand.Reader, binary.LittleEndian, &s); err != nil {
+		s = time.Now().UnixNano()
+	}
+	r := rand.New(rand.NewSource(s))
+
 	results := make([]Result, samples)
 	minDelay := time.Duration(1<<63 - 1) // the maximum number of time.Duration
 	for i := range results {
@@ -69,7 +77,10 @@ func (c *Client) GetMulti(uri string, samples int) (Result, error) {
 		if results[i].Delay < minDelay {
 			minDelay = results[i].Delay
 		}
-		time.Sleep(time.Second)
+		if i < samples-1 {
+			d := r.Int63n(int64(time.Second))
+			time.Sleep(time.Duration(d))
+		}
 	}
 
 	var result Result
