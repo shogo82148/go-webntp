@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.com/shogo82148/go-webntp.svg?branch=master)](https://travis-ci.com/shogo82148/go-webntp)
+[![GoDoc](https://godoc.org/github.com/shogo82148/go-webntp?status.svg)](https://godoc.org/github.com/shogo82148/go-webntp)
+
 # WebNTP
 
 WebNTP is NTP(-like) service via HTTP/WebSocket.
