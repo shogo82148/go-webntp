@@ -9,6 +9,9 @@ go:
   - '1.12.x'
   - 'tip'
 
+before_install:
+  - go get github.com/mattn/goveralls
+
 script:
   - make test
   - goveralls -coverprofile=coverage.out -service=travis-ci
