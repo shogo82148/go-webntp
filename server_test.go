@@ -2,6 +2,7 @@ package webntp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -22,7 +23,22 @@ func TestServer_ServeHTTP(t *testing.T) {
 	s.Start()
 	defer s.Close()
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/foo?1234567890.0", nil)
+	want := map[string]interface{}{
+		"id":   "example.com",
+		"it":   1234567890.0,
+		"st":   1234567891.0,
+		"time": 1234567891.0,
+		"leap": 0.0,
+		"next": 0.0,
+		"step": 0.0,
+	}
+	testServeHTTP(t, s, 1234567890.0, want)
+	testServeWebSocket(t, s, 1234567890.0, want)
+}
+
+func testServeHTTP(t *testing.T, s *Server, it float64, want map[string]interface{}) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com/foo?%f", it), nil)
 	w := httptest.NewRecorder()
 	s.ServeHTTP(w, req)
 
@@ -34,29 +50,13 @@ func TestServer_ServeHTTP(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]interface{}{
-		"id":   "example.com",
-		"it":   1234567890.0,
-		"st":   1234567891.0,
-		"time": 1234567891.0,
-		"leap": 0.0,
-		"next": 0.0,
-		"step": 0.0,
-	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("response mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func TestServer_ServeWebSocket(t *testing.T) {
-	defer func(f func() time.Time) { timeNow = f }(timeNow)
-	timeNow = func() time.Time {
-		return time.Unix(1234567891, 0)
-	}
-
-	s := &Server{}
-	s.Start()
-	defer s.Close()
+func testServeWebSocket(t *testing.T, s *Server, it float64, want map[string]interface{}) {
+	t.Helper()
 	ts := httptest.NewServer(s)
 	defer ts.Close()
 
@@ -68,27 +68,20 @@ func TestServer_ServeWebSocket(t *testing.T) {
 		Proxy:        http.ProxyFromEnvironment,
 		Subprotocols: []string{Subprotocol},
 	}
-	conn, _, err := dialer.Dial(wsURL, nil)
+	h := http.Header{}
+	h.Set("Host", "example.com")
+	conn, _, err := dialer.Dial(wsURL, h)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	if err := conn.WriteJSON(1234567890.0); err != nil {
+	if err := conn.WriteJSON(it); err != nil {
 		t.Fatal(err)
 	}
 
 	var got map[string]interface{}
 	if err := conn.ReadJSON(&got); err != nil {
 		t.Fatal(err)
-	}
-	want := map[string]interface{}{
-		"id":   u.Host,
-		"it":   1234567890.0,
-		"st":   1234567891.0,
-		"time": 1234567891.0,
-		"leap": 0.0,
-		"next": 0.0,
-		"step": 0.0,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("response mismatch (-want +got):\n%s", diff)
