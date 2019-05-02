@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -41,9 +42,13 @@ type Server struct {
 	leapSecondsList atomic.Value
 	ctx             context.Context
 	cancel          context.CancelFunc
+	wg              sync.WaitGroup
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
 	if websocket.IsWebSocketUpgrade(req) {
 		s.handleWebsocket(rw, req)
 		return
@@ -150,6 +155,7 @@ func (s *Server) Start() error {
 // Close closes the server.
 func (s *Server) Close() error {
 	s.cancel()
+	s.wg.Wait()
 	return nil
 }
 
