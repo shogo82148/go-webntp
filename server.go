@@ -17,6 +17,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// timeNow is used by tests.
+var timeNow = func() time.Time {
+	return time.Now()
+}
+
 var defaultUpgrader = &websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -44,7 +49,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	now := time.Now()
+	now := timeNow()
 	leap := s.getLeapSecond(now)
 	start := zeroEpochTime
 	if q := req.URL.RawQuery; q != "" {
@@ -111,7 +116,7 @@ func (s *Server) handleWebsocketConn(conn *websocket.Conn, host string) error {
 	}
 
 	// send the response
-	now := time.Now()
+	now := timeNow()
 	leap := s.getLeapSecond(now)
 	res := &Response{
 		ID:           host,
