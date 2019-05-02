@@ -36,6 +36,80 @@ func TestServer_ServeHTTP(t *testing.T) {
 	testServeWebSocket(t, s, 1234567890.0, want)
 }
 
+func TestServer_ServeHTTP_with_leap(t *testing.T) {
+	now := time.Now()
+	defer func(f func() time.Time) { timeNow = f }(timeNow)
+	timeNow = func() time.Time {
+		return now
+	}
+
+	s := &Server{
+		LeapSecondsPath: "testdata/leap-seconds-2019-05-02.list",
+	}
+	s.Start()
+	defer s.Close()
+
+	t.Run("before leap second", func(t *testing.T) {
+		now, _ = time.Parse(time.RFC3339, "2015-06-30T23:59:59Z")
+		want := map[string]interface{}{
+			"id":   "example.com",
+			"it":   1234567890.0,
+			"st":   1435708799.0, // 2015-06-30T23:59:59Z
+			"time": 1435708799.0, // 2015-06-30T23:59:59Z
+			"leap": 35.0,
+			"next": 1435708800.0, // next leap second is on 2015-07-01
+			"step": 1.0,
+		}
+		testServeHTTP(t, s, 1234567890.0, want)
+		testServeWebSocket(t, s, 1234567890.0, want)
+	})
+
+	t.Run("after leap second", func(t *testing.T) {
+		now, _ = time.Parse(time.RFC3339, "2015-07-01T00:00:00Z")
+		want := map[string]interface{}{
+			"id":   "example.com",
+			"it":   1234567890.0,
+			"st":   1435708800.0, // 2015-01-01T00:00:00Z
+			"time": 1435708800.0, // 2015-01-01T00:00:00Z
+			"leap": 36.0,
+			"next": 1483228800.0, // next leap second is on 2017-01-01
+			"step": 1.0,
+		}
+		testServeHTTP(t, s, 1234567890.0, want)
+		testServeWebSocket(t, s, 1234567890.0, want)
+	})
+
+	t.Run("before leap second", func(t *testing.T) {
+		now, _ = time.Parse(time.RFC3339, "2016-12-31T23:59:59Z")
+		want := map[string]interface{}{
+			"id":   "example.com",
+			"it":   1234567890.0,
+			"st":   1483228799.0, // 2016-12-31T23:59:59Z
+			"time": 1483228799.0, // 2016-12-31T23:59:59Z
+			"leap": 36.0,
+			"next": 1483228800.0, // next leap second is on 2017-01-01
+			"step": 1.0,
+		}
+		testServeHTTP(t, s, 1234567890.0, want)
+		testServeWebSocket(t, s, 1234567890.0, want)
+	})
+
+	t.Run("next leap second is not scheduled", func(t *testing.T) {
+		now, _ = time.Parse(time.RFC3339, "2017-01-01T00:00:00Z")
+		want := map[string]interface{}{
+			"id":   "example.com",
+			"it":   1234567890.0,
+			"st":   1483228800.0, // 2017-01-01T00:00:00Z
+			"time": 1483228800.0, // 2015-01-01T00:00:00Z
+			"leap": 36.0,
+			"next": 1483228800.0, // next leap second is not scheduled, so return last one. It is on 2017-01-01
+			"step": 1.0,
+		}
+		testServeHTTP(t, s, 1234567890.0, want)
+		testServeWebSocket(t, s, 1234567890.0, want)
+	})
+}
+
 func testServeHTTP(t *testing.T, s *Server, it float64, want map[string]interface{}) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com/foo?%f", it), nil)

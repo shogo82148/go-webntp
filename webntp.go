@@ -117,7 +117,7 @@ type Response struct {
 	// It is for htptime compatibility.
 	Time Timestamp `json:"time"`
 
-	// Leap is from TAI to UTC. (before Response.Next)
+	// Leap is from TAI to UTC. (**before** Response.Next)
 	Leap int `json:"leap"`
 
 	// Next is the time of next or last leap second event.
@@ -133,7 +133,7 @@ type LeapSecond struct {
 	// At is the time to insert/delete a leap second.
 	At time.Time
 
-	// Leap is offset from TAI to UTC. (before LeapSecond.Time)
+	// Leap is offset from TAI to UTC. (**after** LeapSecond.Time)
 	Leap int
 
 	// Step describes next leap second is insertion or deletion.
