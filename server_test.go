@@ -14,8 +14,8 @@ import (
 )
 
 func TestServer_ServeHTTP(t *testing.T) {
-	defer func(f func() time.Time) { timeNow = f }(timeNow)
-	timeNow = func() time.Time {
+	defer func(f func() time.Time) { serverTime = f }(serverTime)
+	serverTime = func() time.Time {
 		return time.Unix(1234567891, 0)
 	}
 
@@ -38,8 +38,8 @@ func TestServer_ServeHTTP(t *testing.T) {
 
 func TestServer_ServeHTTP_with_leap(t *testing.T) {
 	now := time.Now()
-	defer func(f func() time.Time) { timeNow = f }(timeNow)
-	timeNow = func() time.Time {
+	defer func(f func() time.Time) { serverTime = f }(serverTime)
+	serverTime = func() time.Time {
 		return now
 	}
 

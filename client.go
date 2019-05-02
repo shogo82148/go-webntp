@@ -16,6 +16,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// clientStartTime is used by tests.
+var clientStartTime = time.Now
+
+// clientEndTime is used by tests.
+var clientEndTime = time.Now
+
 // Client is a webntp client.
 type Client struct {
 	HTTPClient *http.Client
@@ -112,8 +118,8 @@ func (c *Client) getHTTP(uri string) (Result, error) {
 	// Install ClientTrace
 	var start, end time.Time
 	trace := &httptrace.ClientTrace{
-		WroteRequest:         func(info httptrace.WroteRequestInfo) { start = time.Now() },
-		GotFirstResponseByte: func() { end = time.Now() },
+		WroteRequest:         func(info httptrace.WroteRequestInfo) { start = clientStartTime() },
+		GotFirstResponseByte: func() { end = clientEndTime() },
 	}
 	ctx := httptrace.WithClientTrace(req.Context(), trace)
 	req = req.WithContext(ctx)
@@ -161,7 +167,7 @@ func (c *Client) getWebsocket(uri string) (Result, error) {
 	conn := wsConn.conn
 
 	// Send the request
-	b, err := Timestamp(time.Now()).MarshalJSON()
+	b, err := Timestamp(clientStartTime()).MarshalJSON()
 	if err != nil {
 		return Result{}, err
 	}
@@ -267,7 +273,7 @@ func (conn *wsConn) readLoop() {
 			return
 		}
 
-		end := time.Now()
+		end := clientEndTime()
 		var n int
 		for n < len(buf) && err == nil {
 			var nn int
