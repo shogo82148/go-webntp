@@ -168,7 +168,7 @@ func (s *Server) getLeapSecond(now time.Time) LeapSecond {
 	}
 	var i int
 	for i = len(list.LeapSeconds); i > 0; i-- {
-		if list.LeapSeconds[i-1].At.Before(now) {
+		if !now.Before(list.LeapSeconds[i-1].At) {
 			break
 		}
 	}
