@@ -104,13 +104,28 @@ const Subprotocol = "webntp.shogo82148.com"
 
 // Response is a response from webntp server.
 type Response struct {
-	ID           string    `json:"id"`
+	// ID is the id of the web-ntp server.
+	ID string `json:"id"`
+
+	// InitiateTime is the time that the request has been sent.
 	InitiateTime Timestamp `json:"it"`
-	SendTime     Timestamp `json:"st"`
-	Time         Timestamp `json:"time"` // htptime compatibility
-	Leap         int       `json:"leap"`
-	Next         Timestamp `json:"next"`
-	Step         int       `json:"step"`
+
+	// SendTime is the time that the response has been sent.
+	SendTime Timestamp `json:"st"`
+
+	// Time is a same as SendTime.
+	// It is for htptime compatibility.
+	Time Timestamp `json:"time"`
+
+	// Leap is from TAI to UTC. (**before** Response.Next)
+	Leap int `json:"leap"`
+
+	// Next is the time of next or last leap second event.
+	Next Timestamp `json:"next"`
+
+	// Step describes next or last leap second is insertion or deletion.
+	// +1 is insertion, -1 is deletion.
+	Step int `json:"step"`
 }
 
 // LeapSecond is information for leap-seconds
@@ -118,7 +133,7 @@ type LeapSecond struct {
 	// At is the time to insert/delete a leap second.
 	At time.Time
 
-	// Leap is offset from TAI to UTC. (before LeapSecond.Time)
+	// Leap is offset from TAI to UTC. (**after** LeapSecond.Time)
 	Leap int
 
 	// Step describes next leap second is insertion or deletion.
