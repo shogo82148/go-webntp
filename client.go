@@ -191,7 +191,7 @@ func (c *Client) getHTTP(ctx context.Context, uri string) (Result, error) {
 		ntpTime = time.Time(result.Time) // fallback htptime
 	}
 	delay := end.Sub(start)
-	offset := ntpTime.Sub(start) - delay/2
+	offset := ntpTime.Sub(end) + delay/2
 
 	return Result{
 		Delay:     delay,
@@ -235,7 +235,7 @@ func (c *Client) getWebsocket(ctx context.Context, uri string) (Result, error) {
 		ntpTime = time.Time(result.Time) // fallback htptime
 	}
 	delay := end.Sub(start)
-	offset := ntpTime.Sub(start) - delay/2
+	offset := ntpTime.Sub(end) + delay/2
 	return Result{
 		Delay:     delay,
 		Offset:    offset,
