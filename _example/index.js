@@ -1,10 +1,11 @@
+"use strict";
 /// <reference path="webntp.ts" />
 var WebNTPTest;
 (function (WebNTPTest) {
     const clock = document.getElementById("clock");
     let c = new WebNTP.Client();
     let result;
-    c.get_multi("ws://localhost:8080/", 4).then((r) => {
+    c.get("ws://localhost:8080/").then((r) => {
         console.log(r);
         result = r;
         show();
@@ -17,7 +18,10 @@ var WebNTPTest;
         }
         const now = Date.now();
         const remote = now + result.offset;
-        clock.innerText = new Date(remote).toString();
+        if (clock) {
+            clock.innerText = new Date(remote).toString();
+        }
         requestAnimationFrame(show);
     }
 })(WebNTPTest || (WebNTPTest = {}));
+//# sourceMappingURL=index.js.map
