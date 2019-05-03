@@ -16,7 +16,7 @@ module WebNTP {
 
     interface Request {
         resolve: (r: Result) => void;
-        reject: (reason) => void;
+        reject: (reason: any) => void;
     }
 
     class Connection {
@@ -29,7 +29,7 @@ module WebNTP {
         }
 
         open(): Promise<WebSocket> {
-            return new Promise<WebSocket>((resolve, reject) => {
+            return new Promise<WebSocket>((resolve) => {
                 const conn = new WebSocket(this.url, ["webntp.shogo82148.com"]);
                 this.connection = conn;
                 conn.addEventListener("open", ev => {
@@ -62,7 +62,7 @@ module WebNTP {
 
             promise.then(conn => {
                 const now = Date.now()/1000;
-                conn.send(now);
+                conn.send(now.toString());
             }).catch(reason => {
                 if (this.requests.length > 0) {
                     this.requests.shift().reject(reason);
@@ -131,7 +131,7 @@ module WebNTP {
             return this.get_connection(url).get();
         }
 
-        get_multi(url: string, samples: number): Promise<Result> {
+        async get_multi(url: string, samples: number): Promise<Result> {
             if (samples === 0) {
                 return Promise.resolve({
                     delay: 0,
@@ -141,41 +141,37 @@ module WebNTP {
 
             let promise: Promise<Result[]> = Promise.resolve([]);
             for(let i = 0; i < samples; i++) {
-                promise = promise.then(results => {
-                    return this.get(url).then(result => {
-                        results.push(result);
-                        return results;
-                    });
+                promise = promise.then(async results => {
+                    const result = await this.get(url);
+                    results.push(result);
+                    return results;
                 });
             }
-            return promise.then(results => {
-                // get min delay.
-                let min = results[0].delay;
-                for (let result of results) {
-                    if (result.delay < min) {
-                        min = result.delay;
-                    }
+            const results_1 = await promise;
+            // get min delay.
+            let min = results_1[0].delay;
+            for (let result_1 of results_1) {
+                if (result_1.delay < min) {
+                    min = result_1.delay;
                 }
-
-                // calulate the avarage.
-                let delay = 0;
-                let offset = 0;
-                let count = 0;
-                for (let result of results) {
-                    if (result.delay > min*2) {
-                        // this sample may be re-sent. ignore it.
-                        continue;
-                    }
-                    delay += result.delay;
-                    offset += result.offset;
-                    count++;
+            }
+            // calculate the average.
+            let delay = 0;
+            let offset = 0;
+            let count = 0;
+            for (let result_2 of results_1) {
+                if (result_2.delay > min * 2) {
+                    // this sample may be re-sent. ignore it.
+                    continue;
                 }
-
-                return {
-                    delay: delay/count,
-                    offset: offset/count
-                };
-            });
+                delay += result_2.delay;
+                offset += result_2.offset;
+                count++;
+            }
+            return {
+                delay: delay / count,
+                offset: offset / count
+            };
         }
     }
 }
