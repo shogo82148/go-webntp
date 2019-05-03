@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	crand "crypto/rand"
 	"encoding/binary"
 	"flag"
@@ -110,7 +111,7 @@ func client(hosts []string) (webntp.Result, error) {
 
 	c := &webntp.Client{}
 	for _, arg := range hosts {
-		result, err := c.GetMulti(arg, samples)
+		result, err := c.GetMulti(context.Background(), arg, samples)
 		if err != nil {
 			fmt.Printf("%s: Error %v\n", arg, err)
 		} else {

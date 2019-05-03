@@ -1,6 +1,7 @@
 package webntp
 
 import (
+	"context"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -29,12 +30,12 @@ func TestGet(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{}
-	result, err := c.Get(ts.URL)
+	result, err := c.Get(context.Background(), ts.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Offset != -4*time.Second {
-		t.Errorf("unexpected offset, want %s, got %s", -4*time.Second, result.Offset)
+	if result.Offset != 4*time.Second {
+		t.Errorf("unexpected offset, want %s, got %s", 4*time.Second, result.Offset)
 	}
 	if result.Delay != 2*time.Second {
 		t.Errorf("unexpected delay, want %s, got %s", 2*time.Second, result.Delay)
@@ -66,12 +67,12 @@ func TestGetWebSocket(t *testing.T) {
 	u.Scheme = "ws"
 	wsURL := u.String()
 	c := &Client{}
-	result, err := c.Get(wsURL)
+	result, err := c.Get(context.Background(), wsURL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Offset != -4*time.Second {
-		t.Errorf("unexpected offset, want %s, got %s", -4*time.Second, result.Offset)
+	if result.Offset != 4*time.Second {
+		t.Errorf("unexpected offset, want %s, got %s", 4*time.Second, result.Offset)
 	}
 	if result.Delay != 2*time.Second {
 		t.Errorf("unexpected delay, want %s, got %s", 2*time.Second, result.Delay)
@@ -91,7 +92,7 @@ func BenchmarkGet(b *testing.B) {
 	c := &Client{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c.Get(ts.URL)
+		c.Get(context.Background(), ts.URL)
 	}
 }
 
@@ -111,6 +112,6 @@ func BenchmarkGetWS(b *testing.B) {
 	c := &Client{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		c.Get(wsURL)
+		c.Get(context.Background(), wsURL)
 	}
 }
