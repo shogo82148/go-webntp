@@ -43,6 +43,13 @@ type Server struct {
 	wg              sync.WaitGroup
 }
 
+type serverConn struct {
+	s    *Server
+	conn *websocket.Conn
+	host string
+	ch   chan *Response
+}
+
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	s.wg.Add(1)
 	defer s.wg.Done()
@@ -89,48 +96,78 @@ func (s *Server) handleWebsocket(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer conn.Close()
 
+	ch := make(chan *Response, 1)
+	defer close(ch)
+	c := &serverConn{
+		s:    s,
+		conn: conn,
+		host: req.Host,
+		ch:   ch,
+	}
+
+	go c.handleWrite()
+	c.handleRead()
+}
+
+func (conn *serverConn) handleRead() {
+	ws := conn.conn
 	for {
-		err := s.handleWebsocketConn(conn, req.Host)
-		if _, ok := err.(*websocket.CloseError); ok {
+		ws.SetReadDeadline(time.Now().Add(time.Minute))
+		_, r, err := ws.NextReader()
+		if err != nil {
+			if _, ok := err.(*websocket.CloseError); ok {
+				return
+			}
+			log.Println("websocket error: ", err)
 			return
 		}
+
+		// parse the request
+		buf, err := ioutil.ReadAll(r)
 		if err != nil {
 			log.Println("websocket error: ", err)
 			return
 		}
+		var start Timestamp
+		err = start.UnmarshalJSON(bytes.TrimSpace(buf))
+		if err != nil {
+			log.Println("websocket error: ", err)
+			return
+		}
+
+		// send the response
+		now := serverTime()
+		leap := conn.s.getLeapSecond(now)
+		conn.ch <- &Response{
+			ID:           conn.host,
+			InitiateTime: start,
+			SendTime:     Timestamp(now),
+			Time:         Timestamp(now),
+			Leap:         leap.Leap,
+			Next:         Timestamp(leap.At),
+			Step:         leap.Step,
+		}
 	}
 }
 
-func (s *Server) handleWebsocketConn(conn *websocket.Conn, host string) error {
-	_, r, err := conn.NextReader()
-	if err != nil {
-		return err
+func (conn *serverConn) handleWrite() {
+	ws := conn.conn
+	for {
+		select {
+		case response, ok := <-conn.ch:
+			if !ok {
+				return
+			}
+			ws.WriteJSON(response)
+		case <-conn.s.ctx.Done():
+			ws.WriteControl(
+				websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.CloseGoingAway, ""),
+				time.Now().Add(time.Second),
+			)
+			return
+		}
 	}
-
-	// parse the request
-	buf, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-	var start Timestamp
-	err = start.UnmarshalJSON(bytes.TrimSpace(buf))
-	if err != nil {
-		return err
-	}
-
-	// send the response
-	now := serverTime()
-	leap := s.getLeapSecond(now)
-	res := &Response{
-		ID:           host,
-		InitiateTime: start,
-		SendTime:     Timestamp(now),
-		Time:         Timestamp(now),
-		Leap:         leap.Leap,
-		Next:         Timestamp(leap.At),
-		Step:         leap.Step,
-	}
-	return conn.WriteJSON(res)
 }
 
 // Start starts fetching leap-seconds.list
