@@ -1,4 +1,5 @@
-//+build !linux,!darwin
+//+build !linux !amd64
+//+build !darwin
 
 package ntpdshm
 
