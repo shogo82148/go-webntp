@@ -13,6 +13,26 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+func TestServer_TimeOverHTTPS(t *testing.T) {
+	defer func(f func() time.Time) { serverTime = f }(serverTime)
+	serverTime = func() time.Time {
+		return time.Unix(1234567891, 123123000)
+	}
+
+	s := &Server{}
+	s.Start()
+	defer s.Close()
+
+	req := httptest.NewRequest(http.MethodHead, "http://example.com/.well-known/time", nil)
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, req)
+
+	got := w.Header().Get("X-HTTPSTIME")
+	if got != "1234567891.123123" {
+		t.Errorf("want %s, got %s", "1234567891.123123", got)
+	}
+}
+
 func TestServer_ServeHTTP(t *testing.T) {
 	defer func(f func() time.Time) { serverTime = f }(serverTime)
 	serverTime = func() time.Time {

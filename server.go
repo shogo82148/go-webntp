@@ -58,7 +58,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// /.well-known/time
 	// http://phk.freebsd.dk/time/20151129/#improved-timekeeping-reponse
 	if req.Method == http.MethodHead {
-		b, _ := Timestamp(time.Now()).MarshalJSON()
+		b, _ := Timestamp(serverTime()).MarshalJSON()
 		rw.Header().Set("X-HTTPSTIME", string(b))
 		rw.WriteHeader(http.StatusNoContent)
 		return
