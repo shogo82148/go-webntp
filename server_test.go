@@ -196,3 +196,15 @@ func BenchmarkServeHTTP(b *testing.B) {
 		s.ServeHTTP(w, req)
 	}
 }
+
+func BenchmarkTimeOverHTTPS(b *testing.B) {
+	s := &Server{}
+	s.Start()
+	defer s.Close()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/.well-known/time", nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		s.ServeHTTP(w, req)
+	}
+}
