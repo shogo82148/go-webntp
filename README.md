@@ -97,7 +97,7 @@ and then the WebNTP server returns the time information formatted by JSON.
 - `id`: hostname of the server
 - `it`: the client's timestamp of the request transmission
 - `st`: the server's timestamp
-- `leap`: the seconds of UTC - TAI (before `next`)
+- `leap`: the seconds of TAI - UTC (before `next`)
 - `next`: the timestamp of the next or last leap second 
 - `step`: positive leap second: 1, negative leap second: -1
 
