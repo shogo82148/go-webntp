@@ -54,6 +54,17 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
+	// Time over HTTPS
+	// /.well-known/time
+	// http://phk.freebsd.dk/time/20151129/#improved-timekeeping-reponse
+	if req.Method == http.MethodHead {
+		b, _ := Timestamp(serverTime()).MarshalJSON()
+		rw.Header().Set("X-HTTPSTIME", string(b))
+		rw.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// Time over WebSocket
 	if websocket.IsWebSocketUpgrade(req) {
 		s.handleWebsocket(rw, req)
 		return

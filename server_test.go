@@ -13,6 +13,26 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+func TestServer_TimeOverHTTPS(t *testing.T) {
+	defer func(f func() time.Time) { serverTime = f }(serverTime)
+	serverTime = func() time.Time {
+		return time.Unix(1234567891, 123123000)
+	}
+
+	s := &Server{}
+	s.Start()
+	defer s.Close()
+
+	req := httptest.NewRequest(http.MethodHead, "http://example.com/.well-known/time", nil)
+	w := httptest.NewRecorder()
+	s.ServeHTTP(w, req)
+
+	got := w.Header().Get("X-HTTPSTIME")
+	if got != "1234567891.123123" {
+		t.Errorf("want %s, got %s", "1234567891.123123", got)
+	}
+}
+
 func TestServer_ServeHTTP(t *testing.T) {
 	defer func(f func() time.Time) { serverTime = f }(serverTime)
 	serverTime = func() time.Time {
@@ -170,6 +190,18 @@ func BenchmarkServeHTTP(b *testing.B) {
 	s.Start()
 	defer s.Close()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/foo", nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		s.ServeHTTP(w, req)
+	}
+}
+
+func BenchmarkTimeOverHTTPS(b *testing.B) {
+	s := &Server{}
+	s.Start()
+	defer s.Close()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/.well-known/time", nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()

@@ -89,9 +89,19 @@ $ webntp --help
 
 ## Protocol
 
-WebNTP returns UNIX timestamp by JSON.
-See [the document of http/https service](http://www.nict.go.jp/JST/http.html) by NICT
-(the content is written in japanese).
+### JSON over HTTP
+
+The WebNTP clients access to `http://example.com/?<timestamp>`,
+and then the WebNTP server returns the time information formatted by JSON.
+
+- `id`: hostname of the server
+- `it`: the client's timestamp of the request transmission
+- `st`: the server's timestamp
+- `leap`: the seconds of TAI - UTC (before `next`)
+- `next`: the timestamp of the next or last leap second 
+- `step`: positive leap second: 1, negative leap second: -1
+
+Example:
 
 ``` plain
 $ curl -s http://localhost:8080/?1489217288.328757 | jq .
@@ -106,12 +116,51 @@ $ curl -s http://localhost:8080/?1489217288.328757 | jq .
 }
 ```
 
+It is based on [the document of http/https service](http://www.nict.go.jp/JST/http.html) by NICT (the National Institute of Information and Communications Technology).
+(the content is written in japanese)
+
+### JSON over WebSocket
+
+The WebNTP clients send a message including timestamp,
+and then the WebNTP server returns the time information formatted by JSON.
+JSON format is same as HTTP response.
+
+Example:
+
+```plain
+$ wscat --connect localhost:8080
+connected (press CTRL+C to quit)
+> 1558915619.944235
+< {"id":"localhost:8080","it":1558915619.944235,"st":1558916776.363423,"time":1558916776.363423,"leap":36,"next":1483228800.000000,"step":1}
+```
+
+### Time over HTTPS with Improved timekeeping response
+
+The clients send `HEAD /.well-known/time` HTTP request,
+and then the server returns the timestamp in the response header.
+
+```plain
+X-HTTPSTIME: <timestamp>
+```
+
+Example:
+
+```plain
+$ curl -I localhost:8080
+HTTP/1.1 204 No Content
+X-Httpstime: 1558915632.285965
+Date: Mon, 27 May 2019 00:07:12 GMT
+```
+
+It is based on [Time over HTTPS specification](http://phk.freebsd.dk/time/20151129/).
+
 ## License
 
 This software is released under the MIT License, see LICENSE.
 
 
-## Related Works
+## SEE ALSO
 
+- [Time over HTTPS](http://phk.freebsd.dk/time/20151129/)
 - [htptime](http://www.htptime.org/index.html) (Broken Link)
 - [htp](http://www.vervest.org/htp/)
