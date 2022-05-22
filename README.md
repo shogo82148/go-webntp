@@ -10,7 +10,7 @@ WebNTP is NTP(-like) service via HTTP/WebSocket.
 First, `go get` and start the WebNTP Server.
 
 ``` plain
-$ go get github.com/shogo82148/go-webntp/cmd/webntp
+$ go install github.com/shogo82148/go-webntp/cmd/webntp
 $ webntp -serve :8080
 ```
 
