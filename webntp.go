@@ -284,7 +284,6 @@ func (p *leapSecondsParser) skipLine() {
 			break
 		}
 	}
-	return
 }
 
 func (p *leapSecondsParser) getInt(size int) int64 {
