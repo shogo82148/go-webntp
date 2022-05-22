@@ -7,7 +7,7 @@ WebNTP is NTP(-like) service via HTTP/WebSocket.
 
 ## Synopsis
 
-First, `go get` and start the WebNTP Server.
+First, `go install` and start the WebNTP Server.
 
 ``` plain
 $ go install github.com/shogo82148/go-webntp/cmd/webntp
@@ -30,12 +30,12 @@ server ws://localhost:8080/, offset -0.000013, delay 0.000288
 2017-03-11 18:25:36.668531757 +0900 JST, server ws://localhost:8080/, offset -0.000013
 ```
 
-NICT(National Institute of Information and Communications Technology) provides WebNTP-compatible API.
+I provide a public WebNTP API.
 
 ``` plain
-$ webntp https://ntp-a1.nict.go.jp/cgi-bin/json
-server https://ntp-a1.nict.go.jp/cgi-bin/json, offset -0.006376, delay 0.024411
-2017-03-11 16:08:06.150393313 +0900 JST, server https://ntp-a1.nict.go.jp/cgi-bin/json, offset -0.006376
+$ webntp https://webntp.shogo82148.com/api
+server https://webntp.shogo82148.com/api, offset -0.006376, delay 0.024411
+2017-03-11 16:08:06.150393313 +0900 JST, server https://webntp.shogo82148.com/api, offset -0.006376
 ```
 
 ## Shared Memory support for ntpd
@@ -50,9 +50,8 @@ fudge 127.127.28.2 refid PYTH stratum 10
 Run WebNTP with `-shm 2` option.
 
 ``` plain
-$ webntp -p 1 -shm 2 https://ntp-a1.nict.go.jp/cgi-bin/json https://ntp-b1.nict.go.jp/cgi-bin/json
-server https://ntp-a1.nict.go.jp/cgi-bin/json, offset -0.003258, delay 0.018910
-server https://ntp-b1.nict.go.jp/cgi-bin/json, offset -0.003570, delay 0.021652
+$ webntp -p 1 -shm 2 https://webntp.shogo82148.com/api
+server https://webntp.shogo82148.com/api, offset -0.003258, delay 0.018910
 ```
 
 ntpd starts syncing with WebNTP.
@@ -62,7 +61,7 @@ $ ntpq -p
      remote           refid      st t when poll reach   delay   offset  jitter
 ==============================================================================
  SHM(2)          .PYTH.          10 l    2   64   17    0.000   -3.331   0.384
-*ntp-a2.nict.go. .NICT.           1 u   58   64   37   10.280    1.494   2.028
+*webntp.shogo82. .NICT.           1 u   58   64   37   10.280    1.494   2.028
 ```
 
 
@@ -116,8 +115,8 @@ $ curl -s http://localhost:8080/?1489217288.328757 | jq .
 }
 ```
 
-It is based on [the document of http/https service](http://www.nict.go.jp/JST/http.html) by NICT (the National Institute of Information and Communications Technology).
-(the content is written in japanese)
+It is based on [the document of http/https service](https://jjy.nict.go.jp/QandA/reference/http-archive.html) by NICT (the National Institute of Information and Communications Technology).
+(the content is written in Japanese)
 
 ### JSON over WebSocket
 
@@ -162,5 +161,5 @@ This software is released under the MIT License, see LICENSE.
 ## SEE ALSO
 
 - [Time over HTTPS](http://phk.freebsd.dk/time/20151129/)
-- [htptime](http://www.htptime.org/index.html) (Broken Link)
 - [htp](http://www.vervest.org/htp/)
+- [http/httpsを利用した時刻配信(アーカイブ)](https://jjy.nict.go.jp/QandA/reference/http-archive.html) (The time server using http/https (archived))
