@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -134,7 +133,7 @@ func (conn *serverConn) handleRead() {
 		}
 
 		// parse the request
-		buf, err := ioutil.ReadAll(r)
+		buf, err := io.ReadAll(r)
 		if err != nil {
 			log.Println("websocket error: ", err)
 			return
