@@ -1,5 +1,6 @@
-//+build !linux !amd64
-//+build !darwin
+//go:build (!linux || !amd64) && !darwin
+// +build !linux !amd64
+// +build !darwin
 
 package ntpdshm
 
