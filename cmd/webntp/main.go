@@ -9,6 +9,10 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"runtime"
+	"runtime/debug"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -16,6 +20,10 @@ import (
 	"github.com/shogo82148/go-webntp/ntpdshm"
 )
 
+// the version of webntp. It is set by goreleaser.
+var version string
+
+var showVersion bool
 var help bool
 var serveHost string
 var allowCrossOrigin bool
@@ -25,6 +33,7 @@ var shmUnits uint
 
 func init() {
 	flag.BoolVar(&help, "help", false, "show help")
+	flag.BoolVar(&showVersion, "version", false, "show the version")
 
 	// Server options
 	flag.StringVar(&serveHost, "serve", "", "server host name")
@@ -42,6 +51,10 @@ func main() {
 
 	if serveHost == "" && flag.NArg() == 0 {
 		help = true
+	}
+	if showVersion {
+		fmt.Println(getVersion())
+		return
 	}
 	if help {
 		flag.PrintDefaults()
@@ -182,4 +195,54 @@ func setClock(result webntp.Result) error {
 	}
 
 	return nil
+}
+
+func getVersion() string {
+	var revision string
+	var time string
+	var modified bool
+
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if version == "" {
+			version = info.Main.Version
+		}
+		for _, kv := range info.Settings {
+			switch kv.Key {
+			case "vcs.revision":
+				revision = kv.Value
+			case "vcs.time":
+				time = kv.Value
+			case "vcs.modified":
+				if b, err := strconv.ParseBool(kv.Value); err == nil {
+					modified = b
+				}
+			}
+		}
+	}
+
+	var buf strings.Builder
+	buf.WriteString("webntp version ")
+	if version != "" {
+		buf.WriteString(version)
+	} else {
+		buf.WriteString("unknown")
+	}
+	if revision != "" {
+		buf.WriteString(" (")
+		buf.WriteString(revision)
+		buf.WriteString(" at ")
+		buf.WriteString(time)
+		if modified {
+			buf.WriteString(", modified")
+		}
+		buf.WriteString(")")
+	}
+	buf.WriteString(", built with ")
+	buf.WriteString(runtime.Version())
+	buf.WriteString(" for ")
+	buf.WriteString(runtime.GOOS)
+	buf.WriteString("/")
+	buf.WriteString(runtime.GOARCH)
+
+	return buf.String()
 }
