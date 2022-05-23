@@ -25,3 +25,5 @@ _testmain.go
 /leap-seconds.list
 /artifacts/
 /release/
+
+dist/
