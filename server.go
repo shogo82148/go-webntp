@@ -106,6 +106,9 @@ func (s *Server) handleWebsocket(rw http.ResponseWriter, req *http.Request) {
 	}
 	defer conn.Close()
 
+	// limit the read buffer size to avoid memory exhaustion.
+	conn.SetReadLimit(1024)
+
 	ch := make(chan *Response, 1)
 	defer close(ch)
 	c := &serverConn{
