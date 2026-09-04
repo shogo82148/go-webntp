@@ -43,7 +43,7 @@ func TestServer_ServeHTTP(t *testing.T) {
 	s.Start()
 	defer s.Close()
 
-	want := map[string]interface{}{
+	want := map[string]any{
 		"id":   "example.com",
 		"it":   1234567890.0,
 		"st":   1234567891.0,
@@ -71,7 +71,7 @@ func TestServer_ServeHTTP_with_leap(t *testing.T) {
 
 	t.Run("before leap second", func(t *testing.T) {
 		now, _ = time.Parse(time.RFC3339, "2015-06-30T23:59:59Z")
-		want := map[string]interface{}{
+		want := map[string]any{
 			"id":   "example.com",
 			"it":   1234567890.0,
 			"st":   1435708799.0, // 2015-06-30T23:59:59Z
@@ -86,7 +86,7 @@ func TestServer_ServeHTTP_with_leap(t *testing.T) {
 
 	t.Run("after leap second", func(t *testing.T) {
 		now, _ = time.Parse(time.RFC3339, "2015-07-01T00:00:00Z")
-		want := map[string]interface{}{
+		want := map[string]any{
 			"id":   "example.com",
 			"it":   1234567890.0,
 			"st":   1435708800.0, // 2015-01-01T00:00:00Z
@@ -101,7 +101,7 @@ func TestServer_ServeHTTP_with_leap(t *testing.T) {
 
 	t.Run("before leap second", func(t *testing.T) {
 		now, _ = time.Parse(time.RFC3339, "2016-12-31T23:59:59Z")
-		want := map[string]interface{}{
+		want := map[string]any{
 			"id":   "example.com",
 			"it":   1234567890.0,
 			"st":   1483228799.0, // 2016-12-31T23:59:59Z
@@ -116,7 +116,7 @@ func TestServer_ServeHTTP_with_leap(t *testing.T) {
 
 	t.Run("next leap second is not scheduled", func(t *testing.T) {
 		now, _ = time.Parse(time.RFC3339, "2017-01-01T00:00:00Z")
-		want := map[string]interface{}{
+		want := map[string]any{
 			"id":   "example.com",
 			"it":   1234567890.0,
 			"st":   1483228800.0, // 2017-01-01T00:00:00Z
@@ -130,7 +130,7 @@ func TestServer_ServeHTTP_with_leap(t *testing.T) {
 	})
 }
 
-func testServeHTTP(t *testing.T, s *Server, it float64, want map[string]interface{}) {
+func testServeHTTP(t *testing.T, s *Server, it float64, want map[string]any) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://example.com/foo?%f", it), nil)
 	w := httptest.NewRecorder()
@@ -140,7 +140,7 @@ func testServeHTTP(t *testing.T, s *Server, it float64, want map[string]interfac
 		t.Errorf("unexpected status code: want %d, got %d", http.StatusOK, w.Code)
 	}
 
-	var got map[string]interface{}
+	var got map[string]any
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func testServeHTTP(t *testing.T, s *Server, it float64, want map[string]interfac
 	}
 }
 
-func testServeWebSocket(t *testing.T, s *Server, it float64, want map[string]interface{}) {
+func testServeWebSocket(t *testing.T, s *Server, it float64, want map[string]any) {
 	t.Helper()
 	ts := httptest.NewServer(s)
 	defer ts.Close()
@@ -173,7 +173,7 @@ func testServeWebSocket(t *testing.T, s *Server, it float64, want map[string]int
 		t.Fatal(err)
 	}
 
-	var got map[string]interface{}
+	var got map[string]any
 	if err := conn.ReadJSON(&got); err != nil {
 		t.Fatal(err)
 	}
