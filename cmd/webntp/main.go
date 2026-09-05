@@ -2,247 +2,100 @@ package main
 
 import (
 	"context"
-	crand "crypto/rand"
-	"encoding/binary"
+	"errors"
 	"flag"
-	"fmt"
-	"log"
-	"math/rand"
+	"log/slog"
+	"math"
 	"net/http"
-	"runtime"
-	"runtime/debug"
-	"strconv"
-	"strings"
+	"os"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/shogo82148/go-webntp"
-	"github.com/shogo82148/go-webntp/ntpdshm"
 )
-
-// the version of webntp. It is set by goreleaser.
-var version string
 
 var showVersion bool
 var help bool
 var serveHost string
-var allowCrossOrigin bool
-var leapSecondsPath, leapSecondsURL string
-var samples int
-var shmUnits uint
 
 func init() {
+	// Global options
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&showVersion, "version", false, "show the version")
 
 	// Server options
 	flag.StringVar(&serveHost, "serve", "", "server host name")
-	flag.BoolVar(&allowCrossOrigin, "allow-cross-origin", false, "allow cross origin request")
-	flag.StringVar(&leapSecondsPath, "leap-second-path", "leap-seconds.list", "path for leap-seconds.list cache")
-	flag.StringVar(&leapSecondsURL, "leap-second-url", "https://www.ietf.org/timezones/data/leap-seconds.list", "url for leap-seconds.list")
-
-	// Client options
-	flag.IntVar(&samples, "p", 4, "Specify the number of samples")
-	flag.UintVar(&shmUnits, "shm", 0, "ntpd shared-memory-segment")
 }
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+
+	ctx := context.Background()
 	flag.Parse()
 
 	if serveHost == "" && flag.NArg() == 0 {
-		help = true
-	}
-	if showVersion {
-		fmt.Println(getVersion())
-		return
-	}
-	if help {
 		flag.PrintDefaults()
+		os.Exit(2)
 		return
 	}
 
 	if serveHost != "" {
-		if err := serve(); err != nil {
-			log.Fatal(err)
-		}
-	} else if shmUnits == 0 {
-		if samples < 1 || samples > 8 {
-			log.Fatalf("invalid samples: %d", samples)
-		}
-		if _, err := client(flag.Args()); err != nil {
-			log.Fatal(err)
+		if err := serve(ctx); err != nil {
+			slog.ErrorContext(ctx, "failed to serve", slog.Any("error", err))
+			os.Exit(1)
 		}
 	} else {
-		if samples < 1 || samples > 8 {
-			log.Fatalf("invalid samples: %d", samples)
-		}
-
-		// init random source.
-		var s int64
-		if err := binary.Read(crand.Reader, binary.LittleEndian, &s); err != nil {
-			s = time.Now().UnixNano()
-		}
-		r := rand.New(rand.NewSource(s))
-
-		for {
-			var err error
-			var result webntp.Result
-			if result, err = client(flag.Args()); err != nil {
-				log.Println(err)
-			}
-			if err = setClock(result); err != nil {
-				log.Println(err)
-			}
-			d := r.Int63n(int64(2 * time.Second))
-			time.Sleep(59*time.Second + time.Duration(d))
+		if err := client(ctx, flag.Args()); err != nil {
+			slog.ErrorContext(ctx, "failed to get time", slog.Any("error", err))
+			os.Exit(1)
 		}
 	}
 }
 
-func serve() error {
-	s := &webntp.Server{
-		LeapSecondsPath: leapSecondsPath,
-		LeapSecondsURL:  leapSecondsURL,
-	}
-	if allowCrossOrigin {
-		s.Upgrader = &websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			Subprotocols:    []string{webntp.Subprotocol},
-			CheckOrigin:     func(*http.Request) bool { return true },
-		}
-	}
-	s.Start()
+func serve(ctx context.Context) error {
+	s := webntp.NewServer()
 	return http.ListenAndServe(serveHost, s)
 }
 
-func client(hosts []string) (webntp.Result, error) {
+func client(ctx context.Context, hosts []string) error {
 	best := webntp.Result{
-		Delay: 1<<63 - 1,
+		Delay: math.MaxInt64,
 	}
 	bestHost := ""
 
-	c := &webntp.Client{}
-	for _, arg := range hosts {
-		result, err := c.GetMulti(context.Background(), arg, samples)
+	c := webntp.NewClient()
+	for _, host := range hosts {
+		result, err := c.Get(ctx, host)
 		if err != nil {
-			fmt.Printf("%s: Error %v\n", arg, err)
-		} else {
-			fmt.Printf(
-				"server %s, offset %.6f, delay %.6f\n",
-				arg,
-				result.Offset.Seconds(),
-				result.Delay.Seconds(),
+			slog.ErrorContext(
+				ctx, "failed to get time from host",
+				slog.String("server", host), slog.Any("error", err),
 			)
-			if result.Delay < best.Delay {
-				best = result
-				bestHost = arg
-			}
+			continue
 		}
+		slog.InfoContext(
+			ctx, "got time from host",
+			slog.String("server", host),
+			slog.Float64("offset", result.Offset.Seconds()),
+			slog.Float64("delay", result.Delay.Seconds()),
+		)
+		if result.Delay < best.Delay {
+			best = result
+			bestHost = host
+		}
+	}
+	if bestHost == "" {
+		return errors.New("failed to get time from any host")
 	}
 
 	local := time.Now()
 	remote := local.Add(best.Offset)
-
-	fmt.Printf("%s, server %s, offset %.6f\n", remote, bestHost, best.Offset.Seconds())
-	return best, nil
-}
-
-func setClock(result webntp.Result) error {
-	var precision int32
-	if delay := result.Delay; delay > 0 && delay < time.Second {
-		for delay < time.Second {
-			delay *= 2
-			precision--
-		}
-	} else {
-		for delay > time.Second {
-			delay /= 2
-			precision++
-		}
-	}
-
-	local := time.Now()
-	remote := local.Add(result.Offset)
-
-	shm, err := ntpdshm.Get(shmUnits)
-	if err != nil {
-		return err
-	}
-	shm.Lock()
-	defer shm.Unlock()
-	shm.IncrCount()
-	shm.SetClockTimeStamp(remote)
-	shm.SetReceiveTimeStamp(local)
-	shm.SetPrecision(precision)
-
-	// set leap second indicator
-	leap := result.NextLeap.Sub(remote)
-	if leap <= 0 {
-		shm.SetLeap(ntpdshm.LeapNoWarning)
-		return nil
-	}
-	if leap > 24*time.Hour {
-		shm.SetLeap(ntpdshm.LeapNoWarning)
-		return nil
-	}
-	if result.Step > 0 {
-		shm.SetLeap(ntpdshm.LeapAddSecond)
-	} else if result.Step < 0 {
-		shm.SetLeap(ntpdshm.LeapDelSecond)
-	} else {
-		shm.SetLeap(ntpdshm.LeapNotInSync)
-	}
-
+	slog.InfoContext(
+		ctx, "best time",
+		slog.String("server", bestHost),
+		slog.Time("local", local),
+		slog.Time("remote", remote),
+		slog.Float64("offset", best.Offset.Seconds()),
+		slog.Float64("delay", best.Delay.Seconds()),
+	)
 	return nil
-}
-
-func getVersion() string {
-	var revision string
-	var time string
-	var modified bool
-
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if version == "" {
-			version = info.Main.Version
-		}
-		for _, kv := range info.Settings {
-			switch kv.Key {
-			case "vcs.revision":
-				revision = kv.Value
-			case "vcs.time":
-				time = kv.Value
-			case "vcs.modified":
-				if b, err := strconv.ParseBool(kv.Value); err == nil {
-					modified = b
-				}
-			}
-		}
-	}
-
-	var buf strings.Builder
-	buf.WriteString("webntp version ")
-	if version != "" {
-		buf.WriteString(version)
-	} else {
-		buf.WriteString("unknown")
-	}
-	if revision != "" {
-		buf.WriteString(" (")
-		buf.WriteString(revision)
-		buf.WriteString(" at ")
-		buf.WriteString(time)
-		if modified {
-			buf.WriteString(", modified")
-		}
-		buf.WriteString(")")
-	}
-	buf.WriteString(", built with ")
-	buf.WriteString(runtime.Version())
-	buf.WriteString(" for ")
-	buf.WriteString(runtime.GOOS)
-	buf.WriteString("/")
-	buf.WriteString(runtime.GOARCH)
-
-	return buf.String()
 }
