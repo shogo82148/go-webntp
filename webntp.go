@@ -85,6 +85,19 @@ func (t Timestamp) encode() []byte {
 	return buf
 }
 
+func (t *Timestamp) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	v, err := dec.ReadValue()
+	if err != nil {
+		return err
+	}
+	ts, err := ParseTimestamp(string(v))
+	if err != nil {
+		return err
+	}
+	*t = ts
+	return nil
+}
+
 var zeroEpochTime = Timestamp(time.Unix(0, 0))
 
 // Response is a response from webntp server.
