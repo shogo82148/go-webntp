@@ -19,7 +19,7 @@ func NewServer() *Server {
 		mux:     http.NewServeMux(),
 		nowFunc: time.Now,
 	}
-	s.mux.HandleFunc("/json", s.jsonHandler)
+	s.mux.HandleFunc("GET /json", s.jsonHandler)
 	return s
 }
 
