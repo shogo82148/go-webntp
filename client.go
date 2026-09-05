@@ -43,7 +43,7 @@ func (c *Client) Get(ctx context.Context, uri string) (Result, error) {
 	if strings.EqualFold(u.Scheme, "ws") || strings.EqualFold(u.Scheme, "wss") {
 		return c.getWebSocket(ctx, u)
 	}
-	if strings.EqualFold(u.Scheme, "time") {
+	if u.Path == "/.well-known/time" {
 		return c.getTimeOverHTTP(ctx, u)
 	}
 	return c.getJSON(ctx, u)
@@ -54,7 +54,48 @@ func (c *Client) getWebSocket(ctx context.Context, u *url.URL) (Result, error) {
 }
 
 func (c *Client) getTimeOverHTTP(ctx context.Context, u *url.URL) (Result, error) {
-	return Result{}, nil
+	// Install ClientTrace
+	var start, end time.Time
+	trace := &httptrace.ClientTrace{
+		WroteRequest:         func(info httptrace.WroteRequestInfo) { start = c.startTime() },
+		GotFirstResponseByte: func() { end = c.endTime() },
+	}
+	ctx = httptrace.WithClientTrace(ctx, trace)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, u.String(), nil)
+	if err != nil {
+		return Result{}, err
+	}
+
+	// Send the request
+	client := c.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return Result{}, err
+	}
+	defer resp.Body.Close() //nolint:errcheck // cleanup
+
+	// Parse the response
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return Result{}, fmt.Errorf("webntp: unexpected status code: %d", resp.StatusCode)
+	}
+
+	// Calculate the offset and delay
+	t, err := ParseTimestamp(resp.Header.Get("X-Httpstime"))
+	if err != nil {
+		return Result{}, err
+	}
+	sendTime := time.Time(t)
+	delay := end.Sub(start)
+	offset := sendTime.Sub(end) + delay/2
+
+	return Result{
+		Offset: offset,
+		Delay:  delay,
+	}, nil
 }
 
 func (c *Client) getJSON(ctx context.Context, u *url.URL) (Result, error) {
