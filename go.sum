@@ -1,2 +1,4 @@
+github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
+github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/shogo82148/websocket v0.1.0 h1:i5QTFrKED1pd4sCBJx7DEUOeVnZ/5jcfeCMjdglOvZg=
 github.com/shogo82148/websocket v0.1.0/go.mod h1:bSuxnr5nxqHEqMWBhexvK/OnpV7KcPAx+MyK//bfvWc=

@@ -11,6 +11,8 @@ import (
 	"github.com/shogo82148/websocket"
 )
 
+const lastLeap = 36
+
 var lastLeapTime = Timestamp(time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC))
 
 const timeout = 90 * time.Second
@@ -69,7 +71,7 @@ func (s *Server) jsonHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Leap seconds are scheduled to be abolished,
 		// but for backward compatibility, it returns information on the last inserted leap second.
-		Leap: 36,
+		Leap: lastLeap,
 		Next: lastLeapTime,
 		Step: 1,
 	}
@@ -87,6 +89,9 @@ func (s *Server) jsonHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.WithoutCancel(r.Context())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{Subprotocol},
 		InsecureSkipVerify: true,
@@ -109,16 +114,19 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	go func() {
-		<-timer.C
-		slog.InfoContext(ctx, "websocket connection closed due to timeout")
-		_ = conn.Close(websocket.StatusNormalClosure, "timeout")
+		select {
+		case <-ctx.Done():
+		case <-timer.C:
+			slog.InfoContext(ctx, "websocket connection closed due to timeout")
+			_ = conn.Close(websocket.StatusNormalClosure, "timeout")
+		}
 	}()
 
 	for {
 		typ, buf, err := conn.Read(ctx)
 		if err != nil {
-			if _, ok := errors.AsType[websocket.CloseError](err); ok {
-				slog.InfoContext(ctx, "websocket connection closed", slog.Any("error", err))
+			if ce, ok := errors.AsType[websocket.CloseError](err); ok {
+				slog.InfoContext(ctx, "websocket connection closed", slog.Int("code", int(ce.Code)), slog.String("reason", ce.Reason))
 				return
 			}
 			slog.ErrorContext(ctx, "failed to read from websocket connection", slog.Any("error", err))
@@ -151,7 +159,7 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 			// Leap seconds are scheduled to be abolished,
 			// but for backward compatibility, it returns information on the last inserted leap second.
-			Leap: 36,
+			Leap: lastLeap,
 			Next: lastLeapTime,
 			Step: 1,
 		}
