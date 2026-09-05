@@ -28,12 +28,18 @@ func ParseTimestamp(s string) (Timestamp, error) {
 
 	nsec := int64(0)
 	digit := int64(1e8)
-	for i := 0; i < len(d) && i < 9; i++ {
-		if d[i] < '0' || d[i] > '9' {
+	j := 0
+	for ; j < len(d) && j < 9; j++ {
+		if d[j] < '0' || d[j] > '9' {
 			return Timestamp{}, strconv.ErrSyntax
 		}
-		nsec += int64(d[i]-'0') * digit
+		nsec += int64(d[j]-'0') * digit
 		digit /= 10
+	}
+	for ; j < len(d); j++ {
+		if d[j] < '0' || d[j] > '9' {
+			return Timestamp{}, strconv.ErrSyntax
+		}
 	}
 	return Timestamp(time.Unix(sec, nsec)), nil
 }
