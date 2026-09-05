@@ -44,7 +44,15 @@ func ParseTimestamp(s string) (Timestamp, error) {
 	return Timestamp(time.Unix(sec, nsec)), nil
 }
 
+func (t Timestamp) String() string {
+	return string(t.encode())
+}
+
 func (t Timestamp) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return enc.WriteValue(jsontext.Value(t.encode()))
+}
+
+func (t Timestamp) encode() []byte {
 	tt := time.Time(t)
 	buf := make([]byte, 0, 32)
 	sec := tt.Unix()
@@ -71,7 +79,7 @@ func (t Timestamp) MarshalJSONTo(enc *jsontext.Encoder) error {
 		buf = append(buf, byte(nsec+'0'))
 		buf = bytes.TrimRight(buf, "0")
 	}
-	return enc.WriteValue(jsontext.Value(buf))
+	return buf
 }
 
 var zeroEpochTime = Timestamp(time.Unix(0, 0))

@@ -19,12 +19,24 @@ func NewServer() *Server {
 		mux:     http.NewServeMux(),
 		nowFunc: time.Now,
 	}
+	s.mux.HandleFunc("HEAD /.well-known/time", s.timeOverHTTP)
 	s.mux.HandleFunc("GET /json", s.jsonHandler)
 	return s
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	s.mux.ServeHTTP(rw, req)
+}
+
+// Time over HTTPS
+// https://phk.freebsd.dk/time/20151129/
+func (s *Server) timeOverHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	now := s.nowFunc()
+	w.Header().Set("X-Httpstime", Timestamp(now).String())
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) jsonHandler(w http.ResponseWriter, r *http.Request) {
