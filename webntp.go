@@ -15,39 +15,81 @@ const Subprotocol = "webntp.shogo82148.com"
 type Timestamp time.Time
 
 func ParseTimestamp(s string) (Timestamp, error) {
-	i, d, ok := strings.Cut(s, ".")
-	if !ok {
-		sec, err := strconv.ParseInt(s, 10, 64)
+	mantissa, exponentString, hasExponent := strings.Cut(s, "e")
+	if !hasExponent {
+		mantissa, exponentString, hasExponent = strings.Cut(s, "E")
+	}
+
+	exponent := int64(0)
+	if hasExponent {
+		var err error
+		exponent, err = strconv.ParseInt(exponentString, 10, 32)
 		if err != nil {
 			return Timestamp{}, err
 		}
-		return Timestamp(time.Unix(sec, 0)), nil
 	}
 
-	sec, err := strconv.ParseInt(i, 10, 64)
-	if err != nil {
-		return Timestamp{}, err
+	integer, fraction, hasFraction := strings.Cut(mantissa, ".")
+	if integer == "" || (hasFraction && fraction == "") {
+		return Timestamp{}, strconv.ErrSyntax
+	}
+	negative := integer[0] == '-'
+	start := 0
+	if integer[0] == '+' || integer[0] == '-' {
+		start++
+	}
+	if start == len(integer) {
+		return Timestamp{}, strconv.ErrSyntax
+	}
+	for i := start; i < len(integer); i++ {
+		if integer[i] < '0' || integer[i] > '9' {
+			return Timestamp{}, strconv.ErrSyntax
+		}
+	}
+	for i := range fraction {
+		if fraction[i] < '0' || fraction[i] > '9' {
+			return Timestamp{}, strconv.ErrSyntax
+		}
+	}
+
+	digits := integer[start:] + fraction
+	decimalPos := int64(len(integer)-start) + exponent
+	secEnd := max(decimalPos, 0)
+	secDigits := min(secEnd, int64(len(digits)))
+
+	limit := uint64(1<<63 - 1)
+	if negative {
+		limit++
+	}
+	sec := uint64(0)
+	for i := range secDigits {
+		digit := uint64(digits[i] - '0')
+		if sec > (limit-digit)/10 {
+			return Timestamp{}, strconv.ErrRange
+		}
+		sec = sec*10 + digit
+	}
+	for i := secDigits; i < secEnd; i++ {
+		if sec > limit/10 {
+			return Timestamp{}, strconv.ErrRange
+		}
+		sec *= 10
 	}
 
 	nsec := int64(0)
-	digit := int64(1e8)
-	j := 0
-	for ; j < len(d) && j < 9; j++ {
-		if d[j] < '0' || d[j] > '9' {
-			return Timestamp{}, strconv.ErrSyntax
-		}
-		nsec += int64(d[j]-'0') * digit
-		digit /= 10
-	}
-	for ; j < len(d); j++ {
-		if d[j] < '0' || d[j] > '9' {
-			return Timestamp{}, strconv.ErrSyntax
+	for i := range int64(9) {
+		nsec *= 10
+		index := decimalPos + i
+		if index >= 0 && index < int64(len(digits)) {
+			nsec += int64(digits[index] - '0')
 		}
 	}
-	if sec < 0 {
+	seconds := int64(sec)
+	if negative {
+		seconds = -seconds
 		nsec = -nsec
 	}
-	return Timestamp(time.Unix(sec, nsec)), nil
+	return Timestamp(time.Unix(seconds, nsec)), nil
 }
 
 func (t Timestamp) String() string {
