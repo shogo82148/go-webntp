@@ -1,6 +1,7 @@
 package webntp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
@@ -10,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/shogo82148/websocket"
 )
 
 // Client is a webntp client.
@@ -50,7 +53,52 @@ func (c *Client) Get(ctx context.Context, uri string) (Result, error) {
 }
 
 func (c *Client) getWebSocket(ctx context.Context, u *url.URL) (Result, error) {
-	return Result{}, nil
+	conn, _, err := websocket.Dial(ctx, u.String(), &websocket.DialOptions{
+		HTTPClient:   c.HTTPClient,
+		Subprotocols: []string{Subprotocol},
+	})
+	if err != nil {
+		return Result{}, err
+	}
+	defer conn.CloseNow() //nolint:errcheck // cleanup
+
+	conn.SetReadLimit(1024)
+
+	start := c.startTime()
+	if err := conn.Write(ctx, websocket.MessageText, []byte(Timestamp(start).String())); err != nil {
+		return Result{}, err
+	}
+
+	typ, msg, err := conn.Read(ctx)
+	end := c.endTime()
+	if err != nil {
+		return Result{}, err
+	}
+	if typ != websocket.MessageText {
+		return Result{}, fmt.Errorf("webntp: unexpected message type: %d", typ)
+	}
+
+	var result Response
+	dec := jsontext.NewDecoder(bytes.NewReader(msg))
+	if err := json.UnmarshalDecode(dec, &result); err != nil {
+		return Result{}, err
+	}
+
+	// Calculate the offset and delay
+	sendTime := time.Time(result.SendTime)
+	if sendTime.IsZero() {
+		sendTime = time.Time(result.Time) // fall back to htptime
+	}
+	delay := end.Sub(start)
+	offset := sendTime.Sub(end) + delay/2
+
+	if err := conn.Close(websocket.StatusNormalClosure, "done"); err != nil {
+		return Result{}, err
+	}
+	return Result{
+		Offset: offset,
+		Delay:  delay,
+	}, nil
 }
 
 func (c *Client) getTimeOverHTTP(ctx context.Context, u *url.URL) (Result, error) {
