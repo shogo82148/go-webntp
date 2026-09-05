@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// Subprotocol is a subprotocol name for websocket.
+const Subprotocol = "webntp.shogo82148.com"
+
 // Timestamp is posix unix timestamp.
 type Timestamp time.Time
 
