@@ -66,6 +66,8 @@ func (c *Client) getJSON(ctx context.Context, u *url.URL) (Result, error) {
 	}
 	ctx = httptrace.WithClientTrace(ctx, trace)
 
+	now := c.startTime()
+	u.RawQuery = Timestamp(now).String()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return Result{}, err
