@@ -44,6 +44,9 @@ func ParseTimestamp(s string) (Timestamp, error) {
 			return Timestamp{}, strconv.ErrSyntax
 		}
 	}
+	if sec < 0 {
+		nsec = -nsec
+	}
 	return Timestamp(time.Unix(sec, nsec)), nil
 }
 
@@ -60,6 +63,10 @@ func (t Timestamp) encode() []byte {
 	buf := make([]byte, 0, 32)
 	sec := tt.Unix()
 	nsec := tt.Nanosecond()
+	if sec < 0 && nsec != 0 {
+		sec++
+		nsec = 1e9 - nsec
+	}
 	buf = strconv.AppendInt(buf, sec, 10)
 	if nsec != 0 {
 		buf = append(buf, '.')
