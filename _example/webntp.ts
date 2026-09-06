@@ -1,4 +1,4 @@
-module WebNTP {
+namespace WebNTP {
 
     export interface Response {
         id: string;
