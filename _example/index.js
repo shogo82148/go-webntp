@@ -67,10 +67,11 @@ var WebNTPTest;
             window.setTimeout(synchronize, synchronizationInterval);
         })
             .catch(() => {
-            const delayInSeconds = retryDelay / 1000;
+            const jitteredRetryDelay = retryDelay * (0.5 + Math.random() * 0.5);
+            const delayInSeconds = Math.ceil(jitteredRetryDelay / 1000);
             if (status)
                 status.textContent = `再接続まで ${delayInSeconds}秒`;
-            window.setTimeout(synchronize, retryDelay);
+            window.setTimeout(synchronize, jitteredRetryDelay);
             retryDelay = Math.min(retryDelay * 2, maximumRetryDelay);
         });
     }
