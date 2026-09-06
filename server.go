@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/shogo82148/websocket"
@@ -20,12 +21,16 @@ const timeout = 90 * time.Second
 type Server struct {
 	mux     *http.ServeMux
 	nowFunc func() time.Time
+
+	mu    sync.Mutex
+	conns map[*websocket.Conn]struct{}
 }
 
 func NewServer() *Server {
 	s := &Server{
 		mux:     http.NewServeMux(),
 		nowFunc: time.Now,
+		conns:   make(map[*websocket.Conn]struct{}),
 	}
 	s.mux.HandleFunc("HEAD /.well-known/time", s.timeOverHTTP)
 	s.mux.HandleFunc("GET /json", s.jsonHandler)
@@ -100,7 +105,15 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(ctx, "failed to accept websocket connection", slog.Any("error", err))
 		return
 	}
-	defer conn.CloseNow() //nolint:errcheck // cleanup
+	s.mu.Lock()
+	s.conns[conn] = struct{}{}
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		delete(s.conns, conn)
+		s.mu.Unlock()
+		_ = conn.CloseNow()
+	}()
 	conn.SetReadLimit(1024)
 
 	slog.InfoContext(
@@ -175,4 +188,20 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// Shutdown closes all active websocket connections and releases resources.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for conn := range s.conns {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		_ = conn.Close(websocket.StatusGoingAway, "server shutting down")
+		delete(s.conns, conn)
+	}
+	return nil
 }

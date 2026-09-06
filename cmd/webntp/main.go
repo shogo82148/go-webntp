@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"net/http"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -65,11 +64,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-}
-
-func serve(ctx context.Context) error {
-	s := webntp.NewServer()
-	return http.ListenAndServe(serveHost, s)
 }
 
 func client(ctx context.Context, hosts []string) error {
