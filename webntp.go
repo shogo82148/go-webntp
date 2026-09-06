@@ -116,6 +116,9 @@ func (t Timestamp) encode() []byte {
 	if sec < 0 && nsec != 0 {
 		sec++
 		nsec = 1e9 - nsec
+		if sec == 0 {
+			buf = append(buf, '-')
+		}
 	}
 	buf = strconv.AppendInt(buf, sec, 10)
 	if nsec != 0 {

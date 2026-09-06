@@ -31,6 +31,7 @@ func TestParseTimestamp(t *testing.T) {
 		{"9223372036854775807", Timestamp(time.Unix(1<<63-1, 0))},
 		{"-9223372036854775808", Timestamp(time.Unix(-1<<63, 0))},
 		{"922337203685477580.7e1", Timestamp(time.Unix(1<<63-1, 0))},
+		{"-1e-1", Timestamp(time.Unix(0, -1e8))},
 	}
 
 	for _, test := range tests {
@@ -81,6 +82,7 @@ func TestTimestampMarshalJSONTo(t *testing.T) {
 		{Timestamp(time.Unix(-1, -1e8)), "-1.1"},
 		{Timestamp(time.Unix(1234567890, 0)), "1234567890"},
 		{Timestamp(time.Unix(1234567890, 123456789)), "1234567890.123456789"},
+		{Timestamp(time.Unix(0, -1e8)), "-0.1"},
 	}
 
 	for _, test := range tests {
