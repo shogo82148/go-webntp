@@ -69,11 +69,19 @@ func ParseTimestamp(s string) (Timestamp, error) {
 		}
 		sec = sec*10 + digit
 	}
-	for i := secDigits; i < secEnd; i++ {
-		if sec > limit/10 {
+	trailingZeros := secEnd - secDigits
+	if sec != 0 {
+		// An int64 has at most 19 decimal digits. Reject a larger shift
+		// immediately instead of looping exponent times.
+		if trailingZeros > 19 {
 			return Timestamp{}, strconv.ErrRange
 		}
-		sec *= 10
+		for range trailingZeros {
+			if sec > limit/10 {
+				return Timestamp{}, strconv.ErrRange
+			}
+			sec *= 10
+		}
 	}
 
 	nsec := int64(0)

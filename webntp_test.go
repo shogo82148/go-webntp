@@ -26,6 +26,8 @@ func TestParseTimestamp(t *testing.T) {
 		{"1.234567890123456789e+9", Timestamp(time.Unix(1234567890, 123456789))},
 		{"-11e-1", Timestamp(time.Unix(-1, -1e8))},
 		{"1e-10", Timestamp(time.Unix(0, 0))},
+		{"0e2147483647", Timestamp(time.Unix(0, 0))},
+		{"-0e2147483647", Timestamp(time.Unix(0, 0))},
 		{"9223372036854775807", Timestamp(time.Unix(1<<63-1, 0))},
 		{"-9223372036854775808", Timestamp(time.Unix(-1<<63, 0))},
 		{"922337203685477580.7e1", Timestamp(time.Unix(1<<63-1, 0))},
