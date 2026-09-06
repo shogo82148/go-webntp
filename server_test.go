@@ -209,6 +209,77 @@ func TestServer_ShutdownCanceled(t *testing.T) {
 	}
 }
 
+func TestServer_ShutdownDuringAccept(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+	accept := s.acceptFunc
+	accepted := make(chan struct{})
+	resumeAccept := make(chan struct{})
+	s.acceptFunc = func(w http.ResponseWriter, r *http.Request, opts *websocket.AcceptOptions) (*websocket.Conn, error) {
+		conn, err := accept(w, r, opts)
+		if err == nil {
+			close(accepted)
+			<-resumeAccept
+		}
+		return conn, err
+	}
+	ts := httptest.NewTestServer(t, s)
+
+	type dialResult struct {
+		conn *websocket.Conn
+		err  error
+	}
+	dialed := make(chan dialResult, 1)
+	ctx := t.Context()
+	go func() {
+		conn, _, err := websocket.Dial(ctx, "ws://example.com/websocket", &websocket.DialOptions{
+			HTTPClient:   ts.Client(),
+			Subprotocols: []string{Subprotocol},
+		})
+		dialed <- dialResult{conn: conn, err: err}
+	}()
+
+	<-accepted
+	result := <-dialed
+	if result.err != nil {
+		close(resumeAccept)
+		t.Fatalf("failed to connect to WebSocket: %v", result.err)
+	}
+	conn := result.conn
+	t.Cleanup(func() { _ = conn.CloseNow() })
+
+	readErr := make(chan error, 1)
+	go func() {
+		_, _, err := conn.Read(ctx)
+		readErr <- err
+	}()
+
+	if err := s.Shutdown(ctx); err != nil {
+		close(resumeAccept)
+		t.Fatalf("Shutdown returned an error: %v", err)
+	}
+	close(resumeAccept)
+
+	err := <-readErr
+	var closeErr websocket.CloseError
+	if !errors.As(err, &closeErr) {
+		t.Fatalf("want websocket.CloseError, got %v", err)
+	}
+	if closeErr.Code != websocket.StatusGoingAway {
+		t.Errorf("want close status %d, got %d", websocket.StatusGoingAway, closeErr.Code)
+	}
+	if closeErr.Reason != "server shutting down" {
+		t.Errorf("want close reason %q, got %q", "server shutting down", closeErr.Reason)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.conns) != 0 {
+		t.Errorf("want no active connections, got %d", len(s.conns))
+	}
+}
+
 func BenchmarkServer_JSON(b *testing.B) {
 	s := NewServer()
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/json", nil)

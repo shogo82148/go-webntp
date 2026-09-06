@@ -19,18 +19,21 @@ var lastLeapTime = Timestamp(time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC))
 const timeout = 90 * time.Second
 
 type Server struct {
-	mux     *http.ServeMux
-	nowFunc func() time.Time
+	mux        *http.ServeMux
+	nowFunc    func() time.Time
+	acceptFunc func(http.ResponseWriter, *http.Request, *websocket.AcceptOptions) (*websocket.Conn, error)
 
-	mu    sync.Mutex
-	conns map[*websocket.Conn]struct{}
+	mu           sync.Mutex
+	conns        map[*websocket.Conn]struct{}
+	shuttingDown bool
 }
 
 func NewServer() *Server {
 	s := &Server{
-		mux:     http.NewServeMux(),
-		nowFunc: time.Now,
-		conns:   make(map[*websocket.Conn]struct{}),
+		mux:        http.NewServeMux(),
+		nowFunc:    time.Now,
+		acceptFunc: websocket.Accept,
+		conns:      make(map[*websocket.Conn]struct{}),
 	}
 	s.mux.HandleFunc("HEAD /.well-known/time", s.timeOverHTTP)
 	s.mux.HandleFunc("GET /json", s.jsonHandler)
@@ -97,7 +100,7 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+	conn, err := s.acceptFunc(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{Subprotocol},
 		InsecureSkipVerify: true,
 	})
@@ -106,6 +109,11 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	if s.shuttingDown {
+		s.mu.Unlock()
+		_ = conn.Close(websocket.StatusGoingAway, "server shutting down")
+		return
+	}
 	s.conns[conn] = struct{}{}
 	s.mu.Unlock()
 	defer func() {
@@ -193,15 +201,18 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 // Shutdown closes all active websocket connections and releases resources.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	for conn := range s.conns {
+	s.shuttingDown = true
+	conns := s.conns
+	s.conns = make(map[*websocket.Conn]struct{})
+	s.mu.Unlock()
+
+	for conn := range conns {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 		_ = conn.Close(websocket.StatusGoingAway, "server shutting down")
-		delete(s.conns, conn)
 	}
 	return nil
 }
