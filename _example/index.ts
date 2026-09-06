@@ -38,12 +38,13 @@ namespace WebNTPTest {
 
   function getServerTime(): Promise<WebNTP.Result> {
     return new Promise<WebNTP.Result>((resolve, reject) => {
+      const client = new WebNTP.Client();
       const timeout = window.setTimeout(() => {
+        client.cancel();
         reject(new Error("WebNTP connection timed out"));
       }, connectionTimeout);
 
-      new WebNTP.Client()
-        .get("ws://localhost:8080/websocket")
+      client.get("ws://localhost:8080/websocket")
         .then((result) => {
           window.clearTimeout(timeout);
           resolve(result);
@@ -66,9 +67,21 @@ namespace WebNTPTest {
       })
       .catch(() => {
         const jitteredRetryDelay = retryDelay * (0.5 + Math.random() * 0.5);
-        const delayInSeconds = Math.ceil(jitteredRetryDelay / 1000);
-        if (status) status.textContent = `再接続まで ${delayInSeconds}秒`;
-        window.setTimeout(synchronize, jitteredRetryDelay);
+        const retryAt = Date.now() + jitteredRetryDelay;
+        const updateCountdown = () => {
+          const remainingSeconds = Math.max(
+            0,
+            Math.ceil((retryAt - Date.now()) / 1000),
+          );
+          if (status)
+            status.textContent = `再接続まで ${remainingSeconds}秒`;
+        };
+        updateCountdown();
+        const countdownTimer = window.setInterval(updateCountdown, 250);
+        window.setTimeout(() => {
+          window.clearInterval(countdownTimer);
+          synchronize();
+        }, jitteredRetryDelay);
         retryDelay = Math.min(retryDelay * 2, maximumRetryDelay);
       });
   }

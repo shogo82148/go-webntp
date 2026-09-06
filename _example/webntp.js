@@ -1,36 +1,38 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 var WebNTP;
 (function (WebNTP) {
     class Connection {
+        url;
+        connection;
+        start; // start time [millisecond]
+        resolve;
+        reject;
         constructor(url) {
             this.url = url;
         }
-        open() {
-            return __awaiter(this, void 0, void 0, function* () {
-                return new Promise((resolve) => {
-                    const conn = new WebSocket(this.url, ["webntp.shogo82148.com"]);
-                    this.connection = conn;
-                    conn.addEventListener("open", () => {
-                        resolve(conn);
-                    });
-                    conn.addEventListener("message", (ev) => {
-                        this.onmessage(ev);
-                    });
-                    conn.addEventListener("error", (ev) => {
-                        this.onerror(ev);
-                    });
-                    conn.addEventListener("close", (ev) => {
-                        this.onclose(ev);
-                    });
+        async open() {
+            return new Promise((resolve, reject) => {
+                const conn = new WebSocket(this.url, ["webntp.shogo82148.com"]);
+                this.connection = conn;
+                let opened = false;
+                conn.addEventListener("open", () => {
+                    opened = true;
+                    resolve(conn);
+                });
+                conn.addEventListener("message", (ev) => {
+                    this.onmessage(ev);
+                });
+                conn.addEventListener("error", (ev) => {
+                    if (!opened) {
+                        reject(new Error("Connection error"));
+                    }
+                    this.onerror(ev);
+                });
+                conn.addEventListener("close", (ev) => {
+                    if (!opened) {
+                        reject(new Error("Connection closed"));
+                    }
+                    this.onclose(ev);
                 });
             });
         }
@@ -41,12 +43,14 @@ var WebNTP;
                 return;
             const delay = end - this.start;
             const offset = response.st * 1000 - Date.now() + delay / 2;
+            console.log(`delay: ${delay}, offset: ${offset}`);
             if (this.resolve !== undefined) {
                 this.resolve({
                     delay: delay,
                     offset: offset,
                 });
                 this.resolve = undefined;
+                this.reject = undefined;
             }
             if (this.connection !== undefined) {
                 this.connection.close();
@@ -54,43 +58,67 @@ var WebNTP;
             }
         }
         onerror(ev) {
-            console.log(ev);
+            if (this.reject !== undefined) {
+                this.reject(new Error("Connection error"));
+                this.resolve = undefined;
+                this.reject = undefined;
+            }
+            if (this.connection !== undefined) {
+                this.connection.close();
+                this.connection = undefined;
+            }
         }
         onclose(ev) {
-            console.log(ev);
+            console.log("Connection closed");
+            if (this.reject !== undefined) {
+                console.log("Rejecting due to connection closed");
+                this.reject(new Error("Connection closed"));
+                this.resolve = undefined;
+                this.reject = undefined;
+            }
+            this.connection = undefined;
         }
-        get() {
-            return __awaiter(this, void 0, void 0, function* () {
-                const conn = yield this.open();
+        async get() {
+            const conn = await this.open();
+            return new Promise((resolve, reject) => {
+                this.resolve = resolve;
+                this.reject = reject;
                 const it = Date.now() / 1000;
                 this.start = performance.now();
                 conn.send(it.toString());
-                return new Promise((resolve) => {
-                    this.resolve = resolve;
-                });
             });
+        }
+        cancel() {
+            if (this.reject !== undefined) {
+                this.reject(new Error("Connection cancelled"));
+                this.resolve = undefined;
+                this.reject = undefined;
+            }
+            if (this.connection !== undefined) {
+                this.connection.close();
+                this.connection = undefined;
+            }
         }
     }
     class Client {
-        constructor() {
-            // connection pool
-            this.pool = new Map();
-        }
-        // get_connection from the pool
-        get_connection(url) {
-            let c = this.pool.get(url);
-            if (c !== undefined) {
-                return c;
+        connection;
+        async get(url) {
+            const conn = new Connection(url);
+            this.connection = conn;
+            try {
+                return await conn.get();
             }
-            // create new connection
-            c = new Connection(url);
-            this.pool.set(url, c);
-            return c;
+            finally {
+                if (this.connection === conn) {
+                    this.connection = undefined;
+                }
+            }
         }
-        get(url) {
-            return __awaiter(this, void 0, void 0, function* () {
-                return this.get_connection(url).get();
-            });
+        cancel() {
+            if (this.connection !== undefined) {
+                this.connection.cancel();
+                this.connection = undefined;
+            }
         }
     }
     WebNTP.Client = Client;
