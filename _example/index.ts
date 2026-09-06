@@ -67,8 +67,7 @@ namespace WebNTPTest {
       .catch(() => {
         const jitteredRetryDelay = retryDelay * (0.5 + Math.random() * 0.5);
         const delayInSeconds = Math.ceil(jitteredRetryDelay / 1000);
-        if (status)
-          status.textContent = `再接続まで ${delayInSeconds}秒`;
+        if (status) status.textContent = `再接続まで ${delayInSeconds}秒`;
         window.setTimeout(synchronize, jitteredRetryDelay);
         retryDelay = Math.min(retryDelay * 2, maximumRetryDelay);
       });

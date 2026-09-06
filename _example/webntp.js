@@ -22,13 +22,13 @@ var WebNTP;
                     conn.addEventListener("open", () => {
                         resolve(conn);
                     });
-                    conn.addEventListener("message", ev => {
+                    conn.addEventListener("message", (ev) => {
                         this.onmessage(ev);
                     });
-                    conn.addEventListener("error", ev => {
+                    conn.addEventListener("error", (ev) => {
                         this.onerror(ev);
                     });
-                    conn.addEventListener("close", ev => {
+                    conn.addEventListener("close", (ev) => {
                         this.onclose(ev);
                     });
                 });
