@@ -6,7 +6,11 @@ var WebNTPTest;
     const milliseconds = document.getElementById("milliseconds");
     const date = document.getElementById("date");
     const status = document.getElementById("status");
+    const synchronizationInterval = 10 * 60 * 1000;
+    const connectionTimeout = 5 * 1000;
+    const maximumRetryDelay = 60 * 1000;
     let offset = 0;
+    let retryDelay = 1000;
     const timeFormatter = new Intl.DateTimeFormat("ja-JP", {
         timeZone: "Asia/Tokyo",
         hour: "2-digit",
@@ -34,22 +38,42 @@ var WebNTPTest;
         requestAnimationFrame(render);
     }
     render();
+    function getServerTime() {
+        return new Promise((resolve, reject) => {
+            const timeout = window.setTimeout(() => {
+                reject(new Error("WebNTP connection timed out"));
+            }, connectionTimeout);
+            new WebNTP.Client()
+                .get("ws://localhost:8080/websocket")
+                .then((result) => {
+                window.clearTimeout(timeout);
+                resolve(result);
+            })
+                .catch((reason) => {
+                window.clearTimeout(timeout);
+                reject(reason);
+            });
+        });
+    }
     function synchronize() {
         if (status)
             status.textContent = "接続中";
-        new WebNTP.Client()
-            .get("ws://localhost:8080/websocket")
+        getServerTime()
             .then((result) => {
             offset = result.offset;
+            retryDelay = 1000;
             if (status)
                 status.textContent = "WebNTP 同期済み";
+            window.setTimeout(synchronize, synchronizationInterval);
         })
             .catch(() => {
+            const delayInSeconds = retryDelay / 1000;
             if (status)
-                status.textContent = "端末時刻";
+                status.textContent = `再接続まで ${delayInSeconds}秒`;
+            window.setTimeout(synchronize, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, maximumRetryDelay);
         });
     }
     synchronize();
-    window.setInterval(synchronize, 10 * 60 * 1000);
 })(WebNTPTest || (WebNTPTest = {}));
 //# sourceMappingURL=index.js.map
