@@ -50,6 +50,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 func (s *Server) timeOverHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Expose-Headers", "X-Httpstime")
 
 	now := s.nowFunc()
 	w.Header().Set("X-Httpstime", Timestamp(now).String())
