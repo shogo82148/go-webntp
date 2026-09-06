@@ -4,14 +4,22 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
 	"os"
+	"runtime"
+	"runtime/debug"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shogo82148/go-webntp"
 )
+
+// the version of webntp. It is set by goreleaser.
+var version string
 
 var showVersion bool
 var help bool
@@ -32,6 +40,14 @@ func main() {
 	ctx := context.Background()
 	flag.Parse()
 
+	if showVersion {
+		fmt.Println(getVersion())
+		return
+	}
+	if help {
+		flag.PrintDefaults()
+		return
+	}
 	if serveHost == "" && flag.NArg() == 0 {
 		flag.PrintDefaults()
 		os.Exit(2)
@@ -98,4 +114,54 @@ func client(ctx context.Context, hosts []string) error {
 		slog.Float64("delay", best.Delay.Seconds()),
 	)
 	return nil
+}
+
+func getVersion() string {
+	var revision string
+	var time string
+	var modified bool
+
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if version == "" {
+			version = info.Main.Version
+		}
+		for _, kv := range info.Settings {
+			switch kv.Key {
+			case "vcs.revision":
+				revision = kv.Value
+			case "vcs.time":
+				time = kv.Value
+			case "vcs.modified":
+				if b, err := strconv.ParseBool(kv.Value); err == nil {
+					modified = b
+				}
+			}
+		}
+	}
+
+	var buf strings.Builder
+	buf.WriteString("webntp version ")
+	if version != "" {
+		buf.WriteString(version)
+	} else {
+		buf.WriteString("unknown")
+	}
+	if revision != "" {
+		buf.WriteString(" (")
+		buf.WriteString(revision)
+		buf.WriteString(" at ")
+		buf.WriteString(time)
+		if modified {
+			buf.WriteString(", modified")
+		}
+		buf.WriteString(")")
+	}
+	buf.WriteString(", built with ")
+	buf.WriteString(runtime.Version())
+	buf.WriteString(" for ")
+	buf.WriteString(runtime.GOOS)
+	buf.WriteString("/")
+	buf.WriteString(runtime.GOARCH)
+
+	return buf.String()
 }
