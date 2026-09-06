@@ -19,6 +19,19 @@ func TestParseTimestamp(t *testing.T) {
 		{"-1.1", Timestamp(time.Unix(-1, -1e8))},
 		{"1234567890", Timestamp(time.Unix(1234567890, 0))},
 		{"1234567890.123456789", Timestamp(time.Unix(1234567890, 123456789))},
+		{"1e9", Timestamp(time.Unix(1e9, 0))},
+		{"1E+9", Timestamp(time.Unix(1e9, 0))},
+		{"1.23456789e3", Timestamp(time.Unix(1234, 567890000))},
+		{"1234567890123456789e-9", Timestamp(time.Unix(1234567890, 123456789))},
+		{"1.234567890123456789e+9", Timestamp(time.Unix(1234567890, 123456789))},
+		{"-11e-1", Timestamp(time.Unix(-1, -1e8))},
+		{"1e-10", Timestamp(time.Unix(0, 0))},
+		{"0e2147483647", Timestamp(time.Unix(0, 0))},
+		{"-0e2147483647", Timestamp(time.Unix(0, 0))},
+		{"9223372036854775807", Timestamp(time.Unix(1<<63-1, 0))},
+		{"-9223372036854775808", Timestamp(time.Unix(-1<<63, 0))},
+		{"922337203685477580.7e1", Timestamp(time.Unix(1<<63-1, 0))},
+		{"-1e-1", Timestamp(time.Unix(0, -1e8))},
 	}
 
 	for _, test := range tests {
@@ -40,6 +53,12 @@ func TestParseTimestampInvalid(t *testing.T) {
 		"abc.0",
 		"123.abc",
 		"123.1234567890abc",
+		"1e",
+		"1e2e3",
+		"1.2.3e4",
+		"9223372036854775808",
+		"-9223372036854775809",
+		"1e19",
 	}
 
 	for _, input := range invalidInputs {
@@ -63,6 +82,7 @@ func TestTimestampMarshalJSONTo(t *testing.T) {
 		{Timestamp(time.Unix(-1, -1e8)), "-1.1"},
 		{Timestamp(time.Unix(1234567890, 0)), "1234567890"},
 		{Timestamp(time.Unix(1234567890, 123456789)), "1234567890.123456789"},
+		{Timestamp(time.Unix(0, -1e8)), "-0.1"},
 	}
 
 	for _, test := range tests {
@@ -78,5 +98,68 @@ func TestTimestampMarshalJSONTo(t *testing.T) {
 				t.Errorf("MarshalJSONTo = %q; want %q", got, test.expected)
 			}
 		})
+	}
+}
+
+func FuzzParseTimestamp(f *testing.F) {
+	f.Add("0")
+	f.Add("1")
+	f.Add("-1")
+	f.Add("-1.1")
+	f.Add("1234567890")
+	f.Add("1234567890.123456789")
+	f.Add("1e9")
+	f.Add("1E+9")
+	f.Add("1.23456789e3")
+	f.Add("1234567890123456789e-9")
+	f.Add("1.234567890123456789e+9")
+	f.Add("-11e-1")
+	f.Add("1e-10")
+	f.Add("0e2147483647")
+	f.Add("-0e2147483647")
+	f.Add("9223372036854775807")
+	f.Add("-9223372036854775808")
+	f.Add("922337203685477580.7e1")
+	f.Add("abc")
+	f.Add("abc.0")
+	f.Add("123.abc")
+	f.Add("123.1234567890abc")
+	f.Add("1e")
+	f.Add("1e2e3")
+	f.Add("1.2.3e4")
+	f.Add("9223372036854775808")
+	f.Add("-9223372036854775809")
+	f.Add("1e19")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		got, err := ParseTimestamp(input)
+		if err != nil {
+			return
+		}
+		roundtrip, err := ParseTimestamp(got.String())
+		if err != nil {
+			t.Fatalf("ParseTimestamp(%q) returned error on roundtrip: %v", got.String(), err)
+		}
+		if got != roundtrip {
+			t.Errorf("roundtrip mismatch: got %v; want %v", time.Time(roundtrip), time.Time(got))
+		}
+	})
+}
+
+func BenchmarkParseTimestamp(b *testing.B) {
+	for b.Loop() {
+		_, err := ParseTimestamp("1234567890.123456789")
+		if err != nil {
+			b.Fatalf("ParseTimestamp returned error: %v", err)
+		}
+	}
+}
+
+func BenchmarkParseTimestamp_exp(b *testing.B) {
+	for b.Loop() {
+		_, err := ParseTimestamp("1.23456789e3")
+		if err != nil {
+			b.Fatalf("ParseTimestamp returned error: %v", err)
+		}
 	}
 }
