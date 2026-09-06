@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/shogo82148/websocket"
@@ -18,14 +19,21 @@ var lastLeapTime = Timestamp(time.Date(2017, 1, 1, 0, 0, 0, 0, time.UTC))
 const timeout = 90 * time.Second
 
 type Server struct {
-	mux     *http.ServeMux
-	nowFunc func() time.Time
+	mux        *http.ServeMux
+	nowFunc    func() time.Time
+	acceptFunc func(http.ResponseWriter, *http.Request, *websocket.AcceptOptions) (*websocket.Conn, error)
+
+	mu           sync.Mutex
+	conns        map[*websocket.Conn]struct{}
+	shuttingDown bool
 }
 
 func NewServer() *Server {
 	s := &Server{
-		mux:     http.NewServeMux(),
-		nowFunc: time.Now,
+		mux:        http.NewServeMux(),
+		nowFunc:    time.Now,
+		acceptFunc: websocket.Accept,
+		conns:      make(map[*websocket.Conn]struct{}),
 	}
 	s.mux.HandleFunc("HEAD /.well-known/time", s.timeOverHTTP)
 	s.mux.HandleFunc("GET /json", s.jsonHandler)
@@ -92,7 +100,7 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+	conn, err := s.acceptFunc(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{Subprotocol},
 		InsecureSkipVerify: true,
 	})
@@ -100,7 +108,20 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 		slog.ErrorContext(ctx, "failed to accept websocket connection", slog.Any("error", err))
 		return
 	}
-	defer conn.CloseNow() //nolint:errcheck // cleanup
+	s.mu.Lock()
+	if s.shuttingDown {
+		s.mu.Unlock()
+		_ = conn.Close(websocket.StatusGoingAway, "server shutting down")
+		return
+	}
+	s.conns[conn] = struct{}{}
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		delete(s.conns, conn)
+		s.mu.Unlock()
+		_ = conn.CloseNow()
+	}()
 	conn.SetReadLimit(1024)
 
 	slog.InfoContext(
@@ -175,4 +196,23 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// Shutdown closes all active websocket connections and releases resources.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.mu.Lock()
+	s.shuttingDown = true
+	conns := s.conns
+	s.conns = make(map[*websocket.Conn]struct{})
+	s.mu.Unlock()
+
+	for conn := range conns {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		_ = conn.Close(websocket.StatusGoingAway, "server shutting down")
+	}
+	return nil
 }

@@ -1,7 +1,9 @@
 package webntp
 
 import (
+	"context"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -114,6 +116,161 @@ func TestServer_WebSocket(t *testing.T) {
 
 	if err := conn.Close(websocket.StatusNormalClosure, ""); err != nil {
 		t.Fatalf("failed to close WebSocket: %v", err)
+	}
+}
+
+func TestServer_Shutdown(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+	ts := httptest.NewTestServer(t, s)
+
+	ctx := t.Context()
+	conn, _, err := websocket.Dial(ctx, "ws://example.com/websocket", &websocket.DialOptions{
+		HTTPClient:   ts.Client(),
+		Subprotocols: []string{Subprotocol},
+	})
+	if err != nil {
+		t.Fatalf("failed to connect to WebSocket: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.CloseNow() })
+
+	// Wait until the server has registered the connection before shutting it down.
+	if err := conn.Write(ctx, websocket.MessageText, nil); err != nil {
+		t.Fatalf("failed to write to WebSocket: %v", err)
+	}
+	if _, _, err := conn.Read(ctx); err != nil {
+		t.Fatalf("failed to read from WebSocket: %v", err)
+	}
+
+	readErr := make(chan error, 1)
+	go func() {
+		_, _, err := conn.Read(ctx)
+		readErr <- err
+	}()
+
+	if err := s.Shutdown(ctx); err != nil {
+		t.Fatalf("Shutdown returned an error: %v", err)
+	}
+
+	err = <-readErr
+	var closeErr websocket.CloseError
+	if !errors.As(err, &closeErr) {
+		t.Fatalf("want websocket.CloseError, got %v", err)
+	}
+	if closeErr.Code != websocket.StatusGoingAway {
+		t.Errorf("want close status %d, got %d", websocket.StatusGoingAway, closeErr.Code)
+	}
+	if closeErr.Reason != "server shutting down" {
+		t.Errorf("want close reason %q, got %q", "server shutting down", closeErr.Reason)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.conns) != 0 {
+		t.Errorf("want no active connections, got %d", len(s.conns))
+	}
+}
+
+func TestServer_ShutdownCanceled(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+	ts := httptest.NewTestServer(t, s)
+
+	ctx := t.Context()
+	conn, _, err := websocket.Dial(ctx, "ws://example.com/websocket", &websocket.DialOptions{
+		HTTPClient:   ts.Client(),
+		Subprotocols: []string{Subprotocol},
+	})
+	if err != nil {
+		t.Fatalf("failed to connect to WebSocket: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.CloseNow() })
+
+	// Wait until the server has registered the connection before shutting it down.
+	if err := conn.Write(ctx, websocket.MessageText, nil); err != nil {
+		t.Fatalf("failed to write to WebSocket: %v", err)
+	}
+	if _, _, err := conn.Read(ctx); err != nil {
+		t.Fatalf("failed to read from WebSocket: %v", err)
+	}
+
+	canceledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := s.Shutdown(canceledCtx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("want context.Canceled, got %v", err)
+	}
+}
+
+func TestServer_ShutdownDuringAccept(t *testing.T) {
+	t.Parallel()
+
+	s := NewServer()
+	accept := s.acceptFunc
+	accepted := make(chan struct{})
+	resumeAccept := make(chan struct{})
+	s.acceptFunc = func(w http.ResponseWriter, r *http.Request, opts *websocket.AcceptOptions) (*websocket.Conn, error) {
+		conn, err := accept(w, r, opts)
+		if err == nil {
+			close(accepted)
+			<-resumeAccept
+		}
+		return conn, err
+	}
+	ts := httptest.NewTestServer(t, s)
+
+	type dialResult struct {
+		conn *websocket.Conn
+		err  error
+	}
+	dialed := make(chan dialResult, 1)
+	ctx := t.Context()
+	go func() {
+		conn, _, err := websocket.Dial(ctx, "ws://example.com/websocket", &websocket.DialOptions{
+			HTTPClient:   ts.Client(),
+			Subprotocols: []string{Subprotocol},
+		})
+		dialed <- dialResult{conn: conn, err: err}
+	}()
+
+	<-accepted
+	result := <-dialed
+	if result.err != nil {
+		close(resumeAccept)
+		t.Fatalf("failed to connect to WebSocket: %v", result.err)
+	}
+	conn := result.conn
+	t.Cleanup(func() { _ = conn.CloseNow() })
+
+	readErr := make(chan error, 1)
+	go func() {
+		_, _, err := conn.Read(ctx)
+		readErr <- err
+	}()
+
+	if err := s.Shutdown(ctx); err != nil {
+		close(resumeAccept)
+		t.Fatalf("Shutdown returned an error: %v", err)
+	}
+	close(resumeAccept)
+
+	err := <-readErr
+	var closeErr websocket.CloseError
+	if !errors.As(err, &closeErr) {
+		t.Fatalf("want websocket.CloseError, got %v", err)
+	}
+	if closeErr.Code != websocket.StatusGoingAway {
+		t.Errorf("want close status %d, got %d", websocket.StatusGoingAway, closeErr.Code)
+	}
+	if closeErr.Reason != "server shutting down" {
+		t.Errorf("want close reason %q, got %q", "server shutting down", closeErr.Reason)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.conns) != 0 {
+		t.Errorf("want no active connections, got %d", len(s.conns))
 	}
 }
 
