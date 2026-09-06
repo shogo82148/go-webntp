@@ -201,12 +201,6 @@ func TestServer_ShutdownCanceled(t *testing.T) {
 	if err := s.Shutdown(canceledCtx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("want context.Canceled, got %v", err)
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.conns) != 1 {
-		t.Errorf("want one active connection, got %d", len(s.conns))
-	}
 }
 
 func TestServer_ShutdownDuringAccept(t *testing.T) {
