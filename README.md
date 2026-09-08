@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/shogo82148/go-webntp.svg?branch=master)](https://travis-ci.com/shogo82148/go-webntp)
+[![test](https://github.com/shogo82148/go-webntp/actions/workflows/test.yml/badge.svg)](https://github.com/shogo82148/go-webntp/actions/workflows/test.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/shogo82148/go-webntp.svg)](https://pkg.go.dev/github.com/shogo82148/go-webntp)
 
 # WebNTP
