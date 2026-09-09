@@ -4,5 +4,5 @@ github.com/shogo82148/server-starter/listener v1.1.0 h1:NvhwCdkeKF2z3Lo7MOLAb9zw
 github.com/shogo82148/server-starter/listener v1.1.0/go.mod h1:MWZgC/CTZy2/oD+dC7aH7APMj1JxXRWHbURhLY4Pcks=
 github.com/shogo82148/websocket v0.1.0 h1:i5QTFrKED1pd4sCBJx7DEUOeVnZ/5jcfeCMjdglOvZg=
 github.com/shogo82148/websocket v0.1.0/go.mod h1:bSuxnr5nxqHEqMWBhexvK/OnpV7KcPAx+MyK//bfvWc=
-golang.org/x/sys v0.47.0 h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
-golang.org/x/sys v0.47.0/go.mod h1:4GL1E5IUh+htKOUEOaiffhrAeqysfVGipDYzABqnCmw=
+golang.org/x/sys v0.48.0 h1:bbX/i/6MgT9BVLM9RT1thmxL04yeTAhbEz4SyadbXoo=
+golang.org/x/sys v0.48.0/go.mod h1:hNLxWAXmnKAxqDtdwIYC4bM9oQPEecfsnNMuSxOs3og=

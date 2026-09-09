@@ -8,5 +8,5 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/shogo82148/server-starter/listener v1.1.0
 	github.com/shogo82148/websocket v0.1.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 )
