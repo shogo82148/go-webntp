@@ -13,7 +13,7 @@ workflows:
     '.github/workflows/reviewdog.yml':
         - 'actions/checkout@v7.0.1'
         - 'reviewdog/action-golangci-lint@v2.10.2'
-        - 'reviewdog/action-misspell@v1.30.3'
+        - 'reviewdog/action-misspell@v1.30.4'
     '.github/workflows/test.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-go@v7.0.0'
@@ -45,9 +45,9 @@ dependencies:
         commit: 'sha1-284129a3ac23bc5d8ac1522e0b6511df74a8836d'
         owner_id: 48765237
         repo_id: 208542589
-    'reviewdog/action-misspell@v1.30.3':
-        ref: 'v1.30.3'
-        commit: 'sha1-3467363dab5b42db2b1372c5fd2b1771fea2ea48'
+    'reviewdog/action-misspell@v1.30.4':
+        ref: 'v1.30.4'
+        commit: 'sha1-840bfbe9f804da9afb0bd739dc4689012f3fdd2d'
         owner_id: 48765237
         repo_id: 208637003
     'shogo82148/actions-goveralls@v1.11.5':
