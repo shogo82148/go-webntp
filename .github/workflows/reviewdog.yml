@@ -21,7 +21,7 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v7.0.1
       - name: misspell
-        uses: reviewdog/action-misspell@v1.30.5
+        uses: reviewdog/action-misspell@v1.31.0
         with:
           github_token: ${{ secrets.github_token }}
           locale: "US"
